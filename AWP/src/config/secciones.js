@@ -1,0 +1,66 @@
+
+export const SECCIONES = [
+  {
+    id: 'resumen',
+    texto: 'Resumen general',
+    titulo: 'Resumen general',
+    descripcion: 'Indicadores y actividad de la administración.',
+    icono: 'cuadricula',
+  },
+  {
+    id: 'propiedades',
+    texto: 'Propiedades',
+    titulo: 'Registro e información de Propiedades',
+    descripcion: 'Administración de propiedades y unidades.',
+    icono: 'edificio',
+  },
+  {
+    id: 'residentes',
+    texto: 'Residentes',
+    titulo: 'Residentes',
+    descripcion: 'Información de residentes y propietarios.',
+    icono: 'usuarios',
+  },
+  {
+    id: 'pagos',
+    texto: 'Pagos',
+    titulo: 'Estados de Cuenta, Adeudos y Contratos',
+    descripcion: 'Control financiero, cuotas, recargos e historial de cobros.',
+    icono: 'tarjeta',
+  },
+  {
+    id: 'mantenimiento',
+    texto: 'Mantenimiento',
+    titulo: 'Gestión de mantenimiento',
+    descripcion: 'Órdenes de trabajo y seguimiento de tickets.',
+    icono: 'herramienta',
+  },
+  {
+    id: 'comprobantes',
+    texto: 'Comprobantes',
+    titulo: 'Carga de Comprobantes de Pago',
+    descripcion: 'Comprobantes enviados por los residentes.',
+    icono: 'documento',
+  },
+  {
+    id: 'conciliacion',
+    texto: 'Conciliación',
+    titulo: 'Conciliación y Validación de Pagos',
+    descripcion: 'Revisión y validación de transacciones.',
+    icono: 'validar',
+  },
+  {
+    id: 'reportes',
+    texto: 'Reportes',
+    titulo: 'Analítica',
+    descripcion: 'Indicadores y reportes operativos.',
+    icono: 'grafica',
+  },
+  {
+    id: 'seguridad',
+    texto: 'Seguridad',
+    titulo: 'Control de acceso',
+    descripcion: 'Verificación de visitas y accesos.',
+    icono: 'escudo',
+  },
+]
