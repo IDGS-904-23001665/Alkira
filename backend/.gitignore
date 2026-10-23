@@ -1,0 +1,4 @@
+/config/baseDatos.local.php
+/config/autenticacion.local.php
+.env
+*.log
