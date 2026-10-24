@@ -7,6 +7,7 @@ header('X-Content-Type-Options: nosniff');
 
 require_once dirname(__DIR__) . '/config/Conexion.php';
 require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
+require_once dirname(__DIR__) . '/controllers/KddControlador.php';
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -22,6 +23,7 @@ try {
             ['POST', '/api/auth/login'],
             ['GET', '/api/auth/yo'],
             ['POST', '/api/auth/salir'],
+            ['GET', '/api/kdd/indicadores'],
         ], true)
     ) {
         http_response_code(404);
@@ -42,6 +44,20 @@ try {
     $repositorio = new UsuariosRepositorio($conexion);
     $servicio = new AutenticacionServicio($repositorio, $configuracion['claveJwt']);
     $controlador = new AutenticacionControlador($servicio);
+
+    if ($ruta === '/api/kdd/indicadores') {
+    $repositorioKdd = new KddRepositorio($conexion);
+
+    $servicioKdd = new KddServicio($repositorioKdd);
+
+    $controladorKdd = new KddControlador(
+        $servicioKdd,
+        $servicio
+    );
+
+    $controladorKdd->indicadores();
+    exit;
+}
 
     if ($ruta === '/api/auth/login') {
         $controlador->ingresar();
