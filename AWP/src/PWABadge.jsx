@@ -3,8 +3,7 @@ import './PWABadge.css'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
 function PWABadge() {
-  // periodic sync is disabled, change the value to enable it, the period is in milliseconds
-// You can remove onRegisteredSW callback and registerPeriodicSync function
+ 
   const period = 0
 
   const {
@@ -39,13 +38,13 @@ function PWABadge() {
       && (
         <div className="PWABadge-toast">
           <div className="PWABadge-message">
-            <span id="toast-message">New content available, click on reload button to update.</span>
+            <span id="toast-message"></span>
               
               
           </div>
           <div className="PWABadge-buttons">
-            <button className="PWABadge-toast-button" onClick={() => updateServiceWorker(true)}>Reload</button>
-            <button className="PWABadge-toast-button" onClick={() => close()}>Close</button>
+            <button className="PWABadge-toast-button" onClick={() => updateServiceWorker(true)}>Recargar</button>
+            <button className="PWABadge-toast-button" onClick={() => close()}>Cerrar</button>
           </div>
         </div>
       )}

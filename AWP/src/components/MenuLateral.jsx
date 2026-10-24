@@ -75,7 +75,7 @@ function MenuLateral({ seccionActiva, onCambiarSeccion, onSalir, usuario }) {
 
         <div className="alkira-menu-pie">
           <button type="button" className="alkira-opcion" disabled
-            title="Configuración pendiente de integrar">
+            title="Configuración">
             <Icono nombre="ajustes" /> <span>Configuración</span>
           </button>
           <button type="button" className="alkira-opcion"
