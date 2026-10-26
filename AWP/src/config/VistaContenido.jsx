@@ -1,6 +1,7 @@
 import PaginaPendiente from '../pages/PaginaPendiente.jsx'
+import Propiedades from '../modules/modulo1/Propiedades.jsx'
 
-const PANTALLAS = {}
+const PANTALLAS = { propiedades: Propiedades }
 
 function VistaContenido({ seccion }) {
   const Componente = PANTALLAS[seccion.id] ?? PaginaPendiente
