@@ -6,14 +6,24 @@ header('X-Content-Type-Options: nosniff');
 require_once dirname(__DIR__) . '/config/Conexion.php';
 require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
 require_once dirname(__DIR__) . '/repos/ComprobantesRepositorio.php';
+require_once dirname(__DIR__) . '/controllers/InmueblesControlador.php';
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+// HU01: identificar las rutas del módulo de propiedades e inmuebles.
+$rutaHu01 = is_string($ruta) && (
+    preg_match('#^/api/inmuebles(?:/[1-9][0-9]*(?:/unidades)?)?$#D', $ruta) === 1
+    || preg_match('#^/api/unidades/[1-9][0-9]*(?:/asignaciones)?$#D', $ruta) === 1
+    || preg_match('#^/api/asignaciones/[1-9][0-9]*/finalizar$#D', $ruta) === 1
+    || $ruta === '/api/usuarios/buscar'
+);
 try {
     if ($ruta === '/api/salud' && $metodo === 'GET') {
         echo json_encode(['estado' => 'disponible']);
         exit;
     }
     if (
+        !$rutaHu01 &&
         !in_array([$metodo, $ruta], [
             ['POST', '/api/auth/login'],
             ['GET', '/api/auth/yo'],
@@ -39,6 +49,26 @@ try {
     $repositorio = new UsuariosRepositorio($conexion);
     $servicio = new AutenticacionServicio($repositorio, $configuracion['claveJwt']);
     $controlador = new AutenticacionControlador($servicio);
+
+    // HU01: conservar intacto el controlador del módulo de propiedades.
+    if ($rutaHu01) {
+        $usuario = $servicio->verificarToken($_COOKIE['alkira_token'] ?? null);
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);
+            exit;
+        }
+        if (($usuario['tipoUsuario'] ?? null) !== 'administrador') {
+            http_response_code(403);
+            echo json_encode(['mensaje' => 'No tienes permisos para administrar inmuebles.']);
+            exit;
+        }
+        $controladorInmuebles = new InmueblesControlador(
+            new InmueblesServicio(new InmueblesRepositorio($conexion))
+        );
+        $controladorInmuebles->procesar($metodo, $ruta);
+        exit;
+    }
     // HU03: visualizar PDF, JPG y PNG de forma protegida.
     if ($ruta === '/api/comprobantes/archivo' && $metodo === 'GET') {
         $usuario = $servicio->verificarToken($_COOKIE['alkira_token'] ?? null);

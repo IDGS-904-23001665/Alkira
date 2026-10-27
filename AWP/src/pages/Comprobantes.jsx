@@ -1,19 +1,26 @@
 import { useEffect, useState } from 'react'
 import './Comprobantes.css'
 
+const etiquetasEstado = {
+  pendiente: 'Pendiente',
+  aprobado: 'Aprobado',
+  rechazado: 'Rechazado',
+  preregistrado: 'Preregistrado',
+  en_revision: 'En verificación'
+}
+
 function Comprobantes() {
   const [comprobantes, setComprobantes] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [filtro, setFiltro] = useState('todos')
-
   const [comprobanteSeleccionado, setComprobanteSeleccionado] = useState(null)
-
   const [procesandoRevision, setProcesandoRevision] = useState(false)
   const [mensajeRevision, setMensajeRevision] = useState('')
 
-  // Obtener comprobantes desde PHP y MySQL
   useEffect(() => {
+    let activo = true
+
     async function cargarComprobantes() {
       try {
         const respuesta = await fetch('/api/comprobantes', {
@@ -25,44 +32,27 @@ function Comprobantes() {
         }
 
         const datos = await respuesta.json()
-
-        setComprobantes(
-          Array.isArray(datos.comprobantes)
-            ? datos.comprobantes
-            : []
-        )
-
+        if (activo) {
+          setComprobantes(Array.isArray(datos.comprobantes) ? datos.comprobantes : [])
+        }
       } catch (err) {
-        setError(err.message)
+        if (activo) setError(err.message)
       } finally {
-        setCargando(false)
+        if (activo) setCargando(false)
       }
     }
 
     cargarComprobantes()
+    return () => { activo = false }
   }, [])
 
-  // Conteos históricos de comprobantes (no realizan conciliación).
-  const pendientes = comprobantes.filter(
-    c => c.estado_revision === 'pendiente'
-  ).length
-
-  const aprobados = comprobantes.filter(
-    c => c.estado_revision === 'aprobado'
-  ).length
-
-  const rechazados = comprobantes.filter(
-    c => c.estado_revision === 'rechazado'
-  ).length
-
-  // Filtrar comprobantes
+  const pendientes = comprobantes.filter(c => c.estado_revision === 'pendiente').length
+  const aprobados = comprobantes.filter(c => c.estado_revision === 'aprobado').length
+  const rechazados = comprobantes.filter(c => c.estado_revision === 'rechazado').length
   const comprobantesFiltrados = comprobantes.filter(
-    comprobante =>
-      filtro === 'todos' ||
-      comprobante.estado_revision === filtro
+    c => filtro === 'todos' || c.estado_revision === filtro
   )
 
-  // Formato de moneda mexicana
   function formatoMoneda(monto) {
     return Number(monto).toLocaleString('es-MX', {
       style: 'currency',
@@ -70,7 +60,6 @@ function Comprobantes() {
     })
   }
 
-  // Abrir el detalle del comprobante.
   function abrirDetalle(comprobante) {
     setComprobanteSeleccionado(comprobante)
     setMensajeRevision('')
@@ -81,7 +70,7 @@ function Comprobantes() {
     setMensajeRevision('')
   }
 
-  // HU03.2: confirmar el preregistro de un pago ya existente.
+  // HU03.2: confirmar el preregistro de una transacción ya existente.
   async function confirmarPreregistro() {
     if (
       !comprobanteSeleccionado ||
@@ -117,7 +106,6 @@ function Comprobantes() {
         throw new Error(datos.mensaje || 'No se pudo confirmar el preregistro.')
       }
 
-      // Actualizar el estado en la bandeja sin recargar la página.
       const nuevaRespuesta = await fetch('/api/comprobantes', {
         credentials: 'include'
       })
@@ -146,284 +134,222 @@ function Comprobantes() {
     }
   }
 
+  const tipoSeleccionado = String(comprobanteSeleccionado?.tipo_archivo || '').toUpperCase()
+  const urlArchivo = comprobanteSeleccionado
+    ? `/api/comprobantes/archivo?id=${encodeURIComponent(comprobanteSeleccionado.id_comprobante)}`
+    : ''
+
   return (
-    <div>
-      <h2>Revisión y preregistro de comprobantes de pago</h2>
-
-      <p>
-        Comprobantes enviados por los residentes de ALKIRA.
-      </p>
-
-      {/* TARJETAS DE ESTADÍSTICAS */}
-      <div className="resumen-comprobantes">
-
-        <div className="tarjeta-comprobante">
-          <p>Pendientes de revisión</p>
-          <h2>{pendientes}</h2>
+    <div className="hu03">
+      <header className="hu03-cabecera-pagina">
+        <div>
+          <h1>Comprobantes de pago</h1>
+          <p>Consulta los archivos recibidos y confirma las transacciones para su verificación.</p>
         </div>
+        <span className="hu03-distintivo">HU03.2 · Administración</span>
+      </header>
 
-        <div className="tarjeta-comprobante">
-          <p>Comprobantes aprobados</p>
-          <h2>{aprobados}</h2>
+      <section className="hu03-indicadores" aria-label="Resumen de comprobantes">
+        <div className="hu03-indicador">
+          <span>Total recibidos</span>
+          <strong>{comprobantes.length}</strong>
+          <small>Documentos registrados</small>
         </div>
-
-        <div className="tarjeta-comprobante">
-          <p>Comprobantes rechazados</p>
-          <h2>{rechazados}</h2>
+        <div className="hu03-indicador">
+          <span>Pendientes de revisión</span>
+          <strong>{pendientes}</strong>
+          <small>Por atender</small>
         </div>
+        <div className="hu03-indicador">
+          <span>Aprobados</span>
+          <strong>{aprobados}</strong>
+          <small>Historial de estados</small>
+        </div>
+        <div className="hu03-indicador">
+          <span>Rechazados</span>
+          <strong>{rechazados}</strong>
+          <small>Historial de estados</small>
+        </div>
+      </section>
 
-      </div>
-
-      {/* FILTRO POR ESTADO */}
-      <div className="filtros-comprobantes">
-
-        <label htmlFor="filtro-estado">
-          Filtrar por estado:
-        </label>
-
-        <select
-          id="filtro-estado"
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-        >
-          <option value="todos">Todos</option>
-          <option value="pendiente">Pendientes</option>
-          <option value="aprobado">Aprobados</option>
-          <option value="rechazado">Rechazados</option>
-        </select>
-
-      </div>
-
-      {/* MENSAJES */}
-      {cargando && (
-        <p>Cargando comprobantes...</p>
-      )}
-
-      {error && (
-        <p role="alert">{error}</p>
-      )}
-
-      {mensajeRevision && (
-        <p role="status">{mensajeRevision}</p>
-      )}
-
-      {/* TABLA DE COMPROBANTES */}
-      {!cargando && !error && (
-        <table className="comprobantes-tabla">
-
-          <thead>
-            <tr>
-              <th>Residente</th>
-              <th>Monto</th>
-              <th>Fecha</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {comprobantesFiltrados.map((comprobante) => (
-              <tr key={comprobante.id_comprobante}>
-
-                <td>
-                  {comprobante.nombres}{' '}
-                  {comprobante.apellidos}
-                </td>
-
-                <td>
-                  {formatoMoneda(comprobante.monto)}
-                </td>
-
-                <td>
-                  {comprobante.fecha_carga}
-                </td>
-
-                <td>
-                  <span
-                    className={
-                      `estado-comprobante estado-${comprobante.estado_revision}`
-                    }
-                  >
-                    {comprobante.estado_revision}
-                  </span>
-                </td>
-
-                <td>
-                  <button
-                    type="button"
-                    className="boton-ver-detalle"
-                    onClick={() => abrirDetalle(comprobante)}
-                  >
-                    Ver detalle
-                  </button>
-                </td>
-
-              </tr>
-            ))}
-          </tbody>
-
-        </table>
-      )}
-
-      {/* SIN RESULTADOS */}
-      {!cargando &&
-        !error &&
-        comprobantesFiltrados.length === 0 && (
-          <p className="mensaje-sin-comprobantes">
-            No hay comprobantes con este estado.
-          </p>
-        )}
-
-      {/* DETALLE DEL COMPROBANTE */}
-      {comprobanteSeleccionado && (
-        <div className="detalle-comprobante">
-
-          <h3>Detalle del comprobante</h3>
-
-          <p>
-            <strong>Residente:</strong>{' '}
-            {comprobanteSeleccionado.nombres}{' '}
-            {comprobanteSeleccionado.apellidos}
-          </p>
-
-          <p>
-            <strong>Monto:</strong>{' '}
-            {formatoMoneda(comprobanteSeleccionado.monto)}
-          </p>
-
-          <p>
-            <strong>Fecha:</strong>{' '}
-            {comprobanteSeleccionado.fecha_carga}
-          </p>
-
-          <p>
-            <strong>Método de pago:</strong>{' '}
-            {comprobanteSeleccionado.metodo_pago}
-          </p>
-
-          <p>
-            <strong>Referencia:</strong>{' '}
-            {comprobanteSeleccionado.referencia_bancaria || 'Sin referencia'}
-          </p>
-
-          <p>
-            <strong>Estado:</strong>{' '}
-            <span
-              className={
-                `estado-comprobante estado-${comprobanteSeleccionado.estado_revision}`
-              }
+      <section className="hu03-panel" aria-label="Bandeja de comprobantes">
+        <div className="hu03-panel-cabecera">
+          <div>
+            <h2>Bandeja de comprobantes</h2>
+            <p>Documentos recibidos de los residentes de ALKIRA</p>
+          </div>
+          <label className="hu03-filtro" htmlFor="filtro-estado">
+            <span>Estado</span>
+            <select
+              id="filtro-estado"
+              value={filtro}
+              onChange={e => setFiltro(e.target.value)}
             >
-              {comprobanteSeleccionado.estado_revision}
-            </span>
-          </p>
+              <option value="todos">Todos los estados</option>
+              <option value="pendiente">Pendientes</option>
+              <option value="aprobado">Aprobados</option>
+              <option value="rechazado">Rechazados</option>
+            </select>
+          </label>
+        </div>
 
-          <p>
-            <strong>Estado de la transacción:</strong>{' '}
-            {comprobanteSeleccionado.estado_pago || 'No disponible'}
-          </p>
+        {cargando && <p className="hu03-aviso" role="status">Cargando comprobantes...</p>}
+        {error && <p className="hu03-aviso hu03-aviso-error" role="alert">{error}</p>}
+        {mensajeRevision && <p className="hu03-aviso" role="status">{mensajeRevision}</p>}
 
-          <p>
-            <strong>Archivo registrado:</strong>{' '}
-            {comprobanteSeleccionado.ruta_archivo || 'Sin archivo'}
-          </p>
+        {!cargando && !error && (
+          <div className="hu03-tabla-contenedor">
+            <table className="hu03-tabla">
+              <thead>
+                <tr>
+                  <th>Residente</th>
+                  <th>Monto</th>
+                  <th>Fecha de carga</th>
+                  <th>Estado</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comprobantesFiltrados.map(comprobante => (
+                  <tr key={comprobante.id_comprobante}>
+                    <td>
+                      <strong>{comprobante.nombres} {comprobante.apellidos}</strong>
+                      <small>Comprobante #{comprobante.id_comprobante}</small>
+                    </td>
+                    <td className="hu03-monto">{formatoMoneda(comprobante.monto)}</td>
+                    <td>{comprobante.fecha_carga}</td>
+                    <td>
+                      <span className={`hu03-estado hu03-estado-${comprobante.estado_revision}`}>
+                        {etiquetasEstado[comprobante.estado_revision] || comprobante.estado_revision}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="hu03-enlace"
+                        onClick={() => abrirDetalle(comprobante)}
+                        aria-label={`Ver detalle del comprobante ${comprobante.id_comprobante}`}
+                      >
+                        Ver detalle →
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {comprobantesFiltrados.length === 0 && (
+              <p className="hu03-vacio">No hay comprobantes con este estado.</p>
+            )}
+          </div>
+        )}
+      </section>
 
-          {/* VISTA PREVIA PROTEGIDA DEL DOCUMENTO */}
+      {comprobanteSeleccionado && (
+        <section className="hu03-panel hu03-detalle" aria-label="Detalle del comprobante">
+          <div className="hu03-panel-cabecera">
+            <div>
+              <h2>Detalle del comprobante #{comprobanteSeleccionado.id_comprobante}</h2>
+              <p>Información de la transferencia y documento adjunto</p>
+            </div>
+            <button type="button" className="hu03-boton-secundario" onClick={cerrarDetalle}>
+              Cerrar detalle
+            </button>
+          </div>
+
+          <div className="hu03-detalle-grid">
+            <div className="hu03-dato">
+              <small>Residente</small>
+              <strong>{comprobanteSeleccionado.nombres} {comprobanteSeleccionado.apellidos}</strong>
+            </div>
+            <div className="hu03-dato">
+              <small>Monto</small>
+              <strong>{formatoMoneda(comprobanteSeleccionado.monto)}</strong>
+            </div>
+            <div className="hu03-dato">
+              <small>Método de pago</small>
+              <strong>{comprobanteSeleccionado.metodo_pago || 'No disponible'}</strong>
+            </div>
+            <div className="hu03-dato">
+              <small>Referencia bancaria</small>
+              <strong>{comprobanteSeleccionado.referencia_bancaria || 'Sin referencia'}</strong>
+            </div>
+            <div className="hu03-dato">
+              <small>Fecha de carga</small>
+              <strong>{comprobanteSeleccionado.fecha_carga}</strong>
+            </div>
+            <div className="hu03-dato">
+              <small>Estado del comprobante</small>
+              <span className={`hu03-estado hu03-estado-${comprobanteSeleccionado.estado_revision}`}>
+                {etiquetasEstado[comprobanteSeleccionado.estado_revision] || comprobanteSeleccionado.estado_revision}
+              </span>
+            </div>
+            <div className="hu03-dato">
+              <small>Estado de la transacción</small>
+              <strong>{etiquetasEstado[comprobanteSeleccionado.estado_pago] || comprobanteSeleccionado.estado_pago || 'No disponible'}</strong>
+            </div>
+            <div className="hu03-dato">
+              <small>Archivo registrado</small>
+              <strong className="hu03-ruta-archivo">{comprobanteSeleccionado.ruta_archivo || 'Sin archivo'}</strong>
+            </div>
+          </div>
+
           {comprobanteSeleccionado.ruta_archivo && (
-            <div style={{ margin: '24px 0' }}>
-              <h4>Vista previa del comprobante</h4>
-              {(() => {
-                const tipo = String(comprobanteSeleccionado.tipo_archivo || '').toUpperCase()
-                const url = `/api/comprobantes/archivo?id=${encodeURIComponent(
-                  comprobanteSeleccionado.id_comprobante
-                )}`
-
-                if (tipo === 'PDF') {
-                  return (
-                    <iframe
-                      title={`Vista previa del comprobante ${comprobanteSeleccionado.id_comprobante}`}
-                      src={url}
-                      loading="lazy"
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        height: '480px',
-                        border: '1px solid #d6dce6',
-                        borderRadius: '8px',
-                        backgroundColor: '#fff'
-                      }}
-                    />
-                  )
-                }
-
-                if (tipo === 'JPG' || tipo === 'PNG') {
-                  return (
-                    <img
-                      src={url}
-                      alt={`Comprobante de pago ${comprobanteSeleccionado.id_comprobante}`}
-                      loading="lazy"
-                      style={{
-                        display: 'block',
-                        maxWidth: '100%',
-                        maxHeight: '480px',
-                        width: 'auto',
-                        height: 'auto',
-                        objectFit: 'contain',
-                        border: '1px solid #d6dce6',
-                        borderRadius: '8px',
-                        backgroundColor: '#fff'
-                      }}
-                    />
-                  )
-                }
-
-                return <p>Formato sin vista previa disponible.</p>
-              })()}
-
-              <p style={{ marginTop: '16px' }}>
+            <div className="hu03-documento">
+              <div className="hu03-documento-cabecera">
+                <div>
+                  <h3>Vista previa del documento</h3>
+                  <p>Comprobante protegido · {tipoSeleccionado || 'Archivo'}</p>
+                </div>
                 <a
-                  className="boton-ver-archivo"
-                  href={`/api/comprobantes/archivo?id=${encodeURIComponent(
-                    comprobanteSeleccionado.id_comprobante
-                  )}`}
+                  className="hu03-boton-secundario"
+                  href={urlArchivo}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Abrir documento en otra pestaña
+                  Abrir en otra pestaña ↗
                 </a>
-              </p>
+              </div>
+              <div className="hu03-visor">
+                {tipoSeleccionado === 'PDF' ? (
+                  <iframe
+                    title={`Vista previa del comprobante ${comprobanteSeleccionado.id_comprobante}`}
+                    src={urlArchivo}
+                    loading="lazy"
+                  />
+                ) : tipoSeleccionado === 'JPG' || tipoSeleccionado === 'PNG' ? (
+                  <img
+                    src={urlArchivo}
+                    alt={`Comprobante de pago ${comprobanteSeleccionado.id_comprobante}`}
+                    loading="lazy"
+                  />
+                ) : (
+                  <p>Formato sin vista previa disponible.</p>
+                )}
+              </div>
             </div>
           )}
 
-          {/* HU03.2: preregistro administrativo, sin aprobar el pago. */}
           {comprobanteSeleccionado.estado_revision === 'pendiente' &&
             comprobanteSeleccionado.estado_pago === 'preregistrado' && (
-              <div className="acciones-revision">
+              <div className="hu03-acciones-preregistro">
+                <div>
+                  <strong>Listo para enviar a verificación</strong>
+                  <p>Esta acción inicia la verificación; no aprueba ni rechaza el pago.</p>
+                </div>
                 <button
                   type="button"
-                  className="boton-ver-detalle"
+                  className="hu03-boton-primario"
                   onClick={confirmarPreregistro}
                   disabled={procesandoRevision}
                 >
                   {procesandoRevision
                     ? 'Procesando...'
-                    : 'Confirmar preregistro y enviar a verificación'}
+                    : 'Confirmar preregistro'}
                 </button>
-                <p>Esta acción inicia la verificación, no aprueba el pago.</p>
               </div>
             )}
-
-          {/* CERRAR DETALLE */}
-          <button
-            type="button"
-            className="boton-cerrar-detalle"
-            onClick={cerrarDetalle}
-          >
-            Cerrar detalle
-          </button>
-
-        </div>
+        </section>
       )}
-
     </div>
   )
 }
