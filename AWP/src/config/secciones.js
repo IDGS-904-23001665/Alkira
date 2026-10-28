@@ -29,6 +29,13 @@ export const SECCIONES = [
     icono: 'tarjeta',
   },
   {
+    id: 'incidencias',
+    texto: 'Incidencias',
+    titulo: 'Recepción y Categorización de Incidencias',
+    descripcion: 'Reportes de fallas y evidencias multimedia.',
+    icono: 'documento',
+  },
+  {
     id: 'mantenimiento',
     texto: 'Mantenimiento',
     titulo: 'Gestión de mantenimiento',
