@@ -5,6 +5,8 @@ require_once dirname(__DIR__) . '/repos/UsuariosRepositorio.php';
 
 final class AutenticacionServicio
 {
+    private const TIPOS_MOVILES = ['inquilino', 'propietario', 'tecnico'];
+
     public function __construct(
         private UsuariosRepositorio $repositorio,
         private string $claveJwt
@@ -16,11 +18,21 @@ final class AutenticacionServicio
 
     public function ingresar(string $correo, string $contrasena): ?array
     {
+        return $this->validarAcceso($correo, $contrasena, ['administrador']);
+    }
+
+    public function ingresarMovil(string $correo, string $contrasena): ?array
+    {
+        return $this->validarAcceso($correo, $contrasena, self::TIPOS_MOVILES);
+    }
+
+    private function validarAcceso(string $correo, string $contrasena, array $tiposPermitidos): ?array
+    {
         $usuario = $this->repositorio->buscarPorCorreo(strtolower(trim($correo)));
 
         if (
             !$usuario ||
-            $usuario['tipo_usuario'] !== 'administrador' ||
+            !in_array($usuario['tipo_usuario'], $tiposPermitidos, true) ||
             !password_verify($contrasena, $usuario['contrasena_hash'])
         ) {
             return null;
@@ -44,6 +56,16 @@ final class AutenticacionServicio
     }
 
     public function verificarToken(?string $token): ?array
+    {
+        return $this->verificarAcceso($token, ['administrador']);
+    }
+
+    public function verificarTokenMovil(?string $token): ?array
+    {
+        return $this->verificarAcceso($token, self::TIPOS_MOVILES);
+    }
+
+    private function verificarAcceso(?string $token, array $tiposPermitidos): ?array
     {
         if (!$token || strlen($token) > 4096) {
             return null;
@@ -83,7 +105,7 @@ final class AutenticacionServicio
         }
 
         $usuario = $this->repositorio->buscarPorId($idUsuario);
-        if (!$usuario || $usuario['tipo_usuario'] !== 'administrador') {
+        if (!$usuario || !in_array($usuario['tipo_usuario'], $tiposPermitidos, true)) {
             return null;
         }
 
