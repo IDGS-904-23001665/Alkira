@@ -29,6 +29,7 @@ function Icono({ nombre, tamano = 17 }) {
 
 function MenuLateral({ seccionActiva, onCambiarSeccion, onSalir, usuario }) {
   const [abierto, setAbierto] = useState(false)
+  const [menuPerfilAbierto, setMenuPerfilAbierto] = useState(false)
 
   const seleccionar = (id) => {
     onCambiarSeccion(id)
@@ -74,18 +75,30 @@ function MenuLateral({ seccionActiva, onCambiarSeccion, onSalir, usuario }) {
         </nav>
 
         <div className="alkira-menu-pie">
-          <button type="button" className="alkira-opcion" disabled
-            title="Configuración">
-            <Icono nombre="ajustes" /> <span>Configuración</span>
-          </button>
-          <button type="button" className="alkira-opcion"
-            onClick={onSalir}>
-            <Icono nombre="salir" /> <span>Cerrar sesión</span>
-          </button>
-          <div className="alkira-perfil">
+          {menuPerfilAbierto && (
+            <div className="alkira-menu-perfil">
+              <button type="button" className="alkira-opcion" disabled
+                title="Configuración">
+                <Icono nombre="ajustes" /> <span>Configuración</span>
+              </button>
+              <button type="button" className="alkira-opcion"
+                onClick={onSalir}>
+                <Icono nombre="salir" /> <span>Cerrar sesión</span>
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            className="alkira-perfil"
+            aria-expanded={menuPerfilAbierto}
+            onClick={() => setMenuPerfilAbierto(!menuPerfilAbierto)}
+          >
             <span className="alkira-avatar">{usuario.nombres.charAt(0).toUpperCase()}</span>
-            <span><strong>{usuario.nombres} {usuario.apellidos}</strong><small>{usuario.tipoUsuario}</small></span>
-          </div>
+            <span className="alkira-perfil-info">
+              <strong>{usuario.nombres} {usuario.apellidos}</strong>
+              <small>{usuario.tipoUsuario}</small>
+            </span>
+          </button>
         </div>
       </aside>
     </>

@@ -10,6 +10,8 @@ require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
 require_once dirname(__DIR__) . '/controllers/InmueblesControlador.php';
 require_once dirname(__DIR__) . '/controllers/AdeudosControlador.php';
 require_once dirname(__DIR__) . '/controllers/HistorialContratosControlador.php';
+require_once dirname(__DIR__) . '/controllers/IncidenciasControlador.php';
+require_once dirname(__DIR__) . '/controllers/AccesosQrControlador.php';
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -21,6 +23,19 @@ $rutaHu01 = is_string($ruta) && (
     || $ruta === '/api/usuarios/buscar'
 );
 
+$rutaHu05 = is_string($ruta) && (
+    $ruta === '/api/incidencias'
+    || $ruta === '/api/incidencias/residentes'
+    || preg_match('#^/api/incidencias/[1-9][0-9]*(?:/evidencias|/estado)?$#D', $ruta) === 1
+);
+
+$rutaHu10 = is_string($ruta) && (
+    $ruta === '/api/accesos-qr'
+    || $ruta === '/api/accesos-qr/bitacora'
+    || $ruta === '/api/accesos-qr/validar'
+    || preg_match('#^/api/accesos-qr/[1-9][0-9]*/revocar$#D', $ruta) === 1
+);
+
 try {
     if ($ruta === '/api/salud' && $metodo === 'GET') {
         echo json_encode(['estado' => 'disponible']);
@@ -29,20 +44,21 @@ try {
 
     $rutasAutenticacion = [
         ['POST', '/api/auth/login'],
-        ['GET', '/api/auth/yo'],
+        ['GET',  '/api/auth/yo'],
         ['POST', '/api/auth/salir'],
         ['POST', '/api/auth/login-movil'],
-        ['GET', '/api/auth/yo-movil'],
+        ['GET',  '/api/auth/yo-movil'],
     ];
 
     $rutaAdeudos = $ruta === '/api/adeudos/pendientes' && $metodo === 'GET';
+
     $rutaHistorialContratos = $metodo === 'GET' && is_string($ruta) && (
         $ruta === '/api/pagos/historial'
         || $ruta === '/api/contratos'
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
 
-    if (!$rutaHu01 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true)) {
+    if (!$rutaHu01 && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -82,6 +98,36 @@ try {
             new InmueblesServicio(new InmueblesRepositorio($conexion))
         );
         $controladorInmuebles->procesar($metodo, $ruta);
+        exit;
+    }
+
+    if ($rutaHu05) {
+        $usuario = $servicio->verificarToken($_COOKIE['alkira_token'] ?? null);
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);
+            exit;
+        }
+        $controladorIncidencias = new IncidenciasControlador(
+            new IncidenciasServicio(new IncidenciasRepositorio($conexion)),
+            $usuario
+        );
+        $controladorIncidencias->procesar($metodo, $ruta);
+        exit;
+    }
+
+    if ($rutaHu10) {
+        $usuario = $servicio->verificarToken($_COOKIE['alkira_token'] ?? null);
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);
+            exit;
+        }
+        $controladorAccesosQr = new AccesosQrControlador(
+            new AccesosQrServicio(new AccesosQrRepositorio($conexion)),
+            $usuario
+        );
+        $controladorAccesosQr->procesar($metodo, $ruta);
         exit;
     }
 
