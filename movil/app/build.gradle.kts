@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.pantallasmovil"
+    namespace = "com.alkira.movil"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.pantallasmovil"
+        applicationId = "com.alkira.movil"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
