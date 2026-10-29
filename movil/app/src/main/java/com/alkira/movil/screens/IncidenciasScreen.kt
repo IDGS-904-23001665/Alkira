@@ -1,6 +1,7 @@
 package com.alkira.movil.screens
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -9,8 +10,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,7 +35,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
-fun IncidenciasScreen(modifier: Modifier = Modifier) {
+fun IncidenciasScreen(modifier: Modifier = Modifier, navegacionActiva: Boolean = true) {
     var titulo by rememberSaveable { mutableStateOf("") }
     var descripcion by rememberSaveable { mutableStateOf("") }
     var categoria by rememberSaveable { mutableStateOf("otro") }
@@ -40,7 +43,7 @@ fun IncidenciasScreen(modifier: Modifier = Modifier) {
     var archivo by rememberSaveable { mutableStateOf<String?>(null) }
     var unidadId by rememberSaveable { mutableStateOf<Int?>(null) }
     var clasificar by rememberSaveable { mutableStateOf(false) }
-    var historial by rememberSaveable { mutableStateOf(false) }
+    var historial by rememberSaveable { mutableStateOf(true) }
     var unidades by remember { mutableStateOf<List<UnidadReporte>>(emptyList()) }
     var reportes by remember { mutableStateOf<List<ReporteResidente>>(emptyList()) }
     var cargando by remember { mutableStateOf(true) }
@@ -49,6 +52,9 @@ fun IncidenciasScreen(modifier: Modifier = Modifier) {
     var mensaje by remember { mutableStateOf<String?>(null) }
     val contexto = LocalContext.current
     val alcance = rememberCoroutineScope()
+    val desplazamiento = rememberLazyListState()
+    LaunchedEffect(historial) { desplazamiento.scrollToItem(0) }
+    BackHandler(enabled = navegacionActiva && (!historial || guardando)) { if (!guardando) historial = true }
     val selector = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) archivo = uri.toString()
     }
@@ -62,14 +68,20 @@ fun IncidenciasScreen(modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) { actualizar() }
 
     Column(modifier.fillMaxSize().background(AlkiraCanvasBg).padding(20.dp)) {
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = desplazamiento, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
+                if (!historial) TextButton(onClick = { historial = true }, enabled = !guardando,
+                    contentPadding = PaddingValues(0.dp), colors = ButtonDefaults.textButtonColors(contentColor = AlkiraPrimaryBlue)) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Volver a mis reportes", fontSize = 12.sp)
+                }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(if (historial) "Mis reportes" else "Reportar Incidencia", fontSize = 18.sp,
                         fontWeight = FontWeight.Bold, color = AlkiraTextPrimary, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { historial = !historial }, enabled = !guardando && !cargando,
+                    if (historial) TextButton(onClick = { historial = false }, enabled = !guardando && !cargando,
                         colors = ButtonDefaults.textButtonColors(contentColor = AlkiraPrimaryBlue)) {
-                        Text(if (historial) "Nuevo reporte" else "Mis reportes", fontSize = 12.sp)
+                        Text("Nuevo reporte", fontSize = 12.sp)
                     }
                 }
                 if (!historial) Text("Notifica fallas o problemas en áreas comunes o tu propiedad",
@@ -134,6 +146,7 @@ fun IncidenciasScreen(modifier: Modifier = Modifier) {
                         unidades.find { it.id == unidadId }, archivo?.let(Uri::parse), contexto)
                     titulo = ""; descripcion = ""; archivo = null
                     mensaje = "Reporte #$id enviado correctamente."
+                    historial = true
                     actualizar()
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { error = e.message ?: "No se pudo enviar el reporte." }
