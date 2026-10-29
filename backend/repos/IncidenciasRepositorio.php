@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/ResidentesRepositorio.php';
+
 final class IncidenciasRepositorio
 {
     public function __construct(private PDO $conexion) {}
@@ -70,6 +72,11 @@ final class IncidenciasRepositorio
 
     public function crear(array $datos): int
     {
+        return $this->transaccion(fn() => $this->crearRegistro($datos));
+    }
+
+    private function crearRegistro(array $datos): int
+    {
         $consulta = $this->conexion->prepare(
             'CALL sp_crear_incidencia(
                 :idUsuario,
@@ -116,6 +123,11 @@ final class IncidenciasRepositorio
 
     public function actualizarEstado(int $idIncidencia, array $datos): array|false
     {
+        return $this->transaccion(fn() => $this->actualizarRegistro($idIncidencia, $datos));
+    }
+
+    private function actualizarRegistro(int $idIncidencia, array $datos): array|false
+    {
         $consulta = $this->conexion->prepare(
             'CALL sp_actualizar_estado_incidencia(
                 :idIncidencia,
@@ -139,24 +151,48 @@ final class IncidenciasRepositorio
 
     public function listarResidentesActivos(): array
     {
-        return $this->conexion->query(
-            "SELECT
-                u.id_usuario AS idUsuario,
-                CONCAT(u.nombres, ' ', u.apellidos) AS nombreCompleto,
-                u.correo,
-                u.tipo_usuario AS tipoUsuario,
-                up.id_unidad AS idUnidad,
-                pu.numero_unidad AS numeroUnidad,
-                pu.id_inmueble AS idInmueble,
-                inm.nombre AS nombreInmueble
-            FROM usuarios AS u
-            LEFT JOIN usuarios_propiedades AS up
-                ON up.id_usuario = u.id_usuario
-                AND (up.fecha_fin IS NULL OR up.fecha_fin >= CURRENT_DATE())
-            LEFT JOIN propiedades_unidades AS pu ON pu.id_unidad = up.id_unidad
-            LEFT JOIN inmuebles AS inm ON inm.id_inmueble = pu.id_inmueble
-            WHERE u.activo = 1 AND u.estado = 'activo'
-            ORDER BY u.nombres, u.apellidos"
-        )->fetchAll(PDO::FETCH_ASSOC);
+        return (new ResidentesRepositorio($this->conexion))->listarActivos();
+    }
+
+    public function validarUbicacionResidente(int $idUsuario, ?int $idUnidad, ?int $idInmueble): void
+    {
+        $consulta = $this->conexion->prepare(
+            "SELECT 1 FROM usuarios u
+             WHERE u.id_usuario = :usuario AND u.activo = 1 AND u.estado = 'activo'
+               AND u.tipo_usuario IN ('inquilino', 'propietario')"
+        );
+        $consulta->execute(['usuario' => $idUsuario]);
+        if (!$consulta->fetchColumn()) {
+            throw new InvalidArgumentException('El reportante debe ser un residente activo.');
+        }
+        if ($idUnidad !== null) {
+            $consulta = $this->conexion->prepare(
+                'SELECT pu.id_inmueble FROM usuarios_propiedades up
+                 JOIN propiedades_unidades pu ON pu.id_unidad = up.id_unidad
+                 WHERE up.id_usuario = :usuario AND up.id_unidad = :unidad
+                   AND up.fecha_inicio <= CURRENT_DATE()
+                   AND (up.fecha_fin IS NULL OR up.fecha_fin >= CURRENT_DATE()) LIMIT 1'
+            );
+            $consulta->execute(['usuario' => $idUsuario, 'unidad' => $idUnidad]);
+            $inmueble = $consulta->fetchColumn();
+            if ($inmueble === false || ($idInmueble !== null && (int) $inmueble !== $idInmueble)) {
+                throw new InvalidArgumentException('La unidad y el inmueble deben corresponder al residente.');
+            }
+        } elseif ($idInmueble !== null) {
+            throw new InvalidArgumentException('Selecciona la unidad correspondiente al inmueble.');
+        }
+    }
+    private function transaccion(callable $accion): mixed
+    {
+        $propia = !$this->conexion->inTransaction();
+        if ($propia) $this->conexion->beginTransaction();
+        try {
+            $resultado = $accion();
+            if ($propia) $this->conexion->commit();
+            return $resultado;
+        } catch (Throwable $error) {
+            if ($propia && $this->conexion->inTransaction()) $this->conexion->rollBack();
+            throw $error;
+        }
     }
 }

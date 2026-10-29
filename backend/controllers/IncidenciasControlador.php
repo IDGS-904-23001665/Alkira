@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/services/IncidenciasServicio.php';
+require_once dirname(__DIR__) . '/services/ArchivoEvidencia.php';
 
 final class IncidenciasControlador
 {
@@ -12,8 +13,28 @@ final class IncidenciasControlador
 
     public function procesar(string $metodo, string $ruta): void
     {
+        $archivoGuardado = null;
         try {
-            $idSesion = (int) ($this->usuarioSesion['idUsuario'] ?? 1);
+            $idSesion = (int) ($this->usuarioSesion['idUsuario'] ?? 0);
+
+            if ($idSesion < 1 || ($this->usuarioSesion['tipoUsuario'] ?? '') !== 'administrador') {
+                $this->responder(403, ['mensaje' => 'Solo administración puede gestionar incidencias.']);
+                return;
+            }
+            if ($metodo === 'GET' && preg_match('#^/api/incidencias/([1-9][0-9]*)/evidencias/([1-9][0-9]*)/archivo$#D', $ruta, $ids)) {
+                foreach ($this->servicio->listarEvidencias((int) $ids[1]) as $evidencia) {
+                    if ((int) $evidencia['idEvidencia'] !== (int) $ids[2]) continue;
+                    $archivo = ArchivoEvidencia::ruta((string) $evidencia['rutaArchivo']);
+                    if ($archivo === null || !is_file($archivo)) break;
+                    header('Content-Type: ' . (new finfo(FILEINFO_MIME_TYPE))->file($archivo));
+                    header('Content-Length: ' . filesize($archivo));
+                    header('Content-Disposition: inline; filename="evidencia.' . pathinfo($archivo, PATHINFO_EXTENSION) . '"');
+                    header("Content-Security-Policy: sandbox; default-src 'none'");
+                    readfile($archivo);
+                    return;
+                }
+                throw new OutOfBoundsException('Archivo de evidencia no disponible.');
+            }
 
             if ($metodo === 'GET' && $ruta === '/api/incidencias') {
                 if (isset($_GET['idUsuario']) && is_numeric($_GET['idUsuario'])) {
@@ -36,7 +57,9 @@ final class IncidenciasControlador
             }
 
             if ($metodo === 'POST' && $ruta === '/api/incidencias') {
-                $incidencia = $this->servicio->crear($this->leerJson(), $idSesion);
+                $entrada = $this->leerEntrada($archivoGuardado);
+                $incidencia = $this->servicio->crear($entrada, $idSesion);
+                $archivoGuardado = null;
                 $this->responder(201, ['incidencia' => $incidencia]);
                 return;
             }
@@ -60,7 +83,9 @@ final class IncidenciasControlador
                 }
 
                 if ($subruta === '/evidencias' && $metodo === 'POST') {
-                    $evidencias = $this->servicio->agregarEvidencia($idIncidencia, $this->leerJson());
+                    $entrada = $this->leerEntrada($archivoGuardado);
+                    $evidencias = $this->servicio->agregarEvidencia($idIncidencia, $entrada);
+                    $archivoGuardado = null;
                     $this->responder(201, ['evidencias' => $evidencias]);
                     return;
                 }
@@ -82,7 +107,23 @@ final class IncidenciasControlador
         } catch (PDOException $error) {
             error_log($error->getMessage());
             $this->responder(500, ['mensaje' => 'No fue posible procesar la operación de incidencias.']);
+        } finally {
+            if ($archivoGuardado !== null) ArchivoEvidencia::eliminar($archivoGuardado);
         }
+    }
+
+    private function leerEntrada(?string &$archivoGuardado): array
+    {
+        if (!str_starts_with($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data')) {
+            return $this->leerJson();
+        }
+        $entrada = $_POST;
+        if (isset($_FILES['archivo']) && ($_FILES['archivo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $archivo = ArchivoEvidencia::guardar($_FILES['archivo']);
+            $archivoGuardado = $archivo['rutaArchivo'];
+            $entrada = array_merge($entrada, $archivo);
+        }
+        return $entrada;
     }
 
     private function leerJson(): array

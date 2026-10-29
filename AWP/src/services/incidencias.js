@@ -1,3 +1,5 @@
+import { listarResidentes } from "./residentes.js";
+
 async function solicitar(ruta, opciones = {}) {
   let respuesta;
   try {
@@ -6,7 +8,7 @@ async function solicitar(ruta, opciones = {}) {
       credentials: "same-origin",
       headers: {
         Accept: "application/json",
-        ...(opciones.body ? { "Content-Type": "application/json" } : {}),
+        ...(opciones.body && !(opciones.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
         ...opciones.headers,
       },
     });
@@ -22,7 +24,14 @@ async function solicitar(ruta, opciones = {}) {
   return datos;
 }
 
-const cuerpo = (datos) => JSON.stringify(datos);
+const cuerpo = (datos) => {
+  if (!datos.archivo) return JSON.stringify(datos);
+  const formulario = new FormData();
+  Object.entries(datos).forEach(([clave, valor]) => {
+    if (valor !== null && valor !== undefined && valor !== "") formulario.append(clave, valor);
+  });
+  return formulario;
+};
 
 export const apiIncidencias = {
   listar: (idUsuario = "") =>
@@ -34,7 +43,7 @@ export const apiIncidencias = {
   detalle: (idIncidencia) => solicitar(`/incidencias/${idIncidencia}`),
   evidencias: (idIncidencia) =>
     solicitar(`/incidencias/${idIncidencia}/evidencias`),
-  residentes: () => solicitar("/incidencias/residentes"),
+  residentes: listarResidentes,
   crear: (datos) =>
     solicitar("/incidencias", { method: "POST", body: cuerpo(datos) }),
   agregarEvidencia: (idIncidencia, datos) =>

@@ -65,6 +65,7 @@ final class IncidenciasServicio
 
         $idInmueble = $this->enteroOpcional($entrada, 'idInmueble');
         $idUnidad = $this->enteroOpcional($entrada, 'idUnidad');
+        $this->repositorio->validarUbicacionResidente($idUsuario, $idUnidad, $idInmueble);
 
         $rutaArchivo = $this->opcional($entrada, 'rutaArchivo', 500);
         $tipoArchivo = $rutaArchivo !== null

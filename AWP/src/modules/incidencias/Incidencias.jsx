@@ -35,12 +35,14 @@ const vacioReporte = {
   descripcion: "",
   categoria: "plomeria",
   urgencia: "media",
+  archivo: null,
   rutaArchivo: "",
   tipoArchivo: "JPG",
   descripcionEvidencia: "",
 };
 
 const vaciaEvidencia = {
+  archivo: null,
   rutaArchivo: "",
   tipoArchivo: "JPG",
   descripcion: "",
@@ -236,7 +238,7 @@ export default function Incidencias() {
         item.titulo.toLowerCase().includes(q) ||
         item.descripcion.toLowerCase().includes(q) ||
         item.nombreReporta.toLowerCase().includes(q) ||
-        item.numeroUnidad.toLowerCase().includes(q) ||
+        (item.numeroUnidad || "").toLowerCase().includes(q) ||
         String(item.idIncidencia).includes(q);
       const coincideCat = !filtroCategoria || item.categoria === filtroCategoria;
       const coincideUrg = !filtroUrgencia || item.urgencia === filtroUrgencia;
@@ -294,9 +296,10 @@ export default function Incidencias() {
     setModalNueva(true);
   }
 
-  function cambiarResidenteForm(idUsuario) {
+  function cambiarResidenteForm(clave) {
+    const [idUsuario, idUnidad] = clave.split(":");
     const r = residentes.find(
-      (item) => Number(item.idUsuario) === Number(idUsuario),
+      (item) => Number(item.idUsuario) === Number(idUsuario) && String(item.idUnidad || "") === idUnidad,
     );
     setFormNueva((prev) => ({
       ...prev,
@@ -322,6 +325,7 @@ export default function Incidencias() {
           descripcion: formNueva.descripcion,
           categoria: formNueva.categoria,
           urgencia: formNueva.urgencia,
+          archivo: formNueva.archivo,
           rutaArchivo: formNueva.rutaArchivo || null,
           tipoArchivo: formNueva.tipoArchivo,
           descripcionEvidencia: formNueva.descripcionEvidencia || null,
@@ -822,7 +826,12 @@ export default function Incidencias() {
                     <small>{ev.fechaCarga}</small>
                   </div>
                   <strong>{ev.descripcion || "Evidencia adjunta"}</strong>
-                  <small>{ev.rutaArchivo}</small>
+                  <small>{ev.rutaArchivo.startsWith('privado:') ? 'Archivo almacenado' : ev.rutaArchivo}</small>
+                  {(ev.rutaArchivo.startsWith('privado:') || /^https?:\/\//i.test(ev.rutaArchivo)) && (
+                    <a href={ev.rutaArchivo.startsWith('privado:')
+                      ? `/api/incidencias/${idIncidenciaSeleccionada}/evidencias/${ev.idEvidencia}/archivo`
+                      : ev.rutaArchivo} target="_blank" rel="noreferrer">Ver evidencia</a>
+                  )}
                 </article>
               ))}
             </div>
@@ -841,12 +850,12 @@ export default function Incidencias() {
             <div className="hu01-form-grid">
               <Campo etiqueta="Residente que reporta">
                 <select
-                  value={formNueva.idUsuarioReporta}
+                  value={`${formNueva.idUsuarioReporta}:${formNueva.idUnidad}`}
                   onChange={(e) => cambiarResidenteForm(e.target.value)}
                   required
                 >
                   {residentes.map((r) => (
-                    <option key={r.idUsuario} value={r.idUsuario}>
+                    <option key={`${r.idUsuario}-${r.idUnidad || "sin-unidad"}`} value={`${r.idUsuario}:${r.idUnidad || ""}`}>
                       {r.nombreCompleto}{" "}
                       {r.numeroUnidad ? `(${r.numeroUnidad})` : ""}
                     </option>
@@ -900,6 +909,10 @@ export default function Incidencias() {
                 </select>
               </Campo>
 
+              <Campo etiqueta="Archivo de evidencia (opcional, máximo 20 MB)">
+                <input type="file" accept="image/jpeg,image/png,video/mp4,application/pdf"
+                  onChange={(e) => setFormNueva({ ...formNueva, archivo: e.target.files[0] || null })} />
+              </Campo>
               <Campo etiqueta="Ruta o URL de evidencia (opcional)">
                 <input
                   type="text"
@@ -1064,16 +1077,21 @@ export default function Incidencias() {
       {modalEvidencia && (
         <Modal
           titulo={`Adjuntar evidencia a incidencia #${idIncidenciaSeleccionada}`}
-          descripcion="Registra la ruta o URL del archivo multimedia en la base de datos."
+          descripcion="Sube un archivo JPG, PNG, MP4 o PDF de hasta 20 MB, o registra una URL existente."
           onCerrar={() => setModalEvidencia(false)}
         >
           <form onSubmit={guardarEvidencia}>
             {errorModal && <p className="hu01-error-modal">{errorModal}</p>}
             <div className="hu01-form-grid">
+              <Campo etiqueta="Archivo de evidencia (máximo 20 MB)">
+                <input type="file" accept="image/jpeg,image/png,video/mp4,application/pdf"
+                  onChange={(e) => setFormEvidencia({ ...formEvidencia, archivo: e.target.files[0] || null })} />
+              </Campo>
               <Campo etiqueta="Ruta o URL del archivo">
                 <input
                   type="text"
                   placeholder="documentos/incidencias/foto_evidencia.jpg"
+                  required={!formEvidencia.archivo}
                   value={formEvidencia.rutaArchivo}
                   onChange={(e) =>
                     setFormEvidencia({
@@ -1081,7 +1099,6 @@ export default function Incidencias() {
                       rutaArchivo: e.target.value,
                     })
                   }
-                  required
                 />
               </Campo>
 
