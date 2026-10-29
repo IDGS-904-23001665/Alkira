@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -91,9 +93,15 @@ private fun AplicacionAutenticada(
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val estadosHistorias = key(usuario.idUsuario) { rememberSaveableStateHolder() }
+    val menuAbierto = drawerState.isOpen || drawerState.targetValue == DrawerValue.Open
     val esTecnico = usuario.tipoUsuario == "tecnico"
     var currentScreen by remember(usuario.idUsuario) {
         mutableStateOf(if (esTecnico) "MANTENIMIENTO" else "INICIO")
+    }
+
+    BackHandler(enabled = menuAbierto || currentScreen == "REPORTAR_FALLA" || currentScreen == "PASES_QR") {
+        if (menuAbierto) scope.launch { drawerState.close() } else currentScreen = "INICIO"
     }
 
     ModalNavigationDrawer(
@@ -292,13 +300,17 @@ private fun AplicacionAutenticada(
                     "PAGOS" -> EstadoCuentaScreen()
                     "SUBIR_PAGO" -> HU03_Screen()
                     "VALIDAR_PAGOS" -> HU04_Screen()
-                    "REPORTAR_FALLA" -> IncidenciasScreen()
+                    "REPORTAR_FALLA" -> estadosHistorias.SaveableStateProvider("HU05") {
+                        IncidenciasScreen(navegacionActiva = !menuAbierto)
+                    }
                     "PROPIEDADES" -> HU01_Screen()
                     "MANTENIMIENTO" -> TicketsScreen(onNavigateBack = { currentScreen = "INICIO" })
                     "COMUNIDAD" -> VotacionesScreen(onNavigateBack = { currentScreen = "INICIO" })
                     "METRICAS" -> MetricasScreen(onNavigateBack = { currentScreen = "INICIO" })
                     "CHAT" -> ChatScreen(onNavigateBack = { currentScreen = "INICIO" })
-                    "PASES_QR" -> PasesQrScreen(onNavigateBack = { currentScreen = "INICIO" })
+                    "PASES_QR" -> estadosHistorias.SaveableStateProvider("HU10") {
+                        PasesQrScreen(navegacionActiva = !menuAbierto, onNavigateBack = { currentScreen = "INICIO" })
+                    }
                     else -> InicioScreen(onNavigate = { currentScreen = it })
                 }
             }

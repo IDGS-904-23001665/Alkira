@@ -2,6 +2,7 @@ package com.alkira.movil.screens
 
 import android.content.Intent
 import android.graphics.Bitmap
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -10,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,7 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun PasesQrScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit = {}) {
+fun PasesQrScreen(modifier: Modifier = Modifier, navegacionActiva: Boolean = true, onNavigateBack: () -> Unit = {}) {
     var nombre by rememberSaveable { mutableStateOf("") }
     var horas by rememberSaveable { mutableIntStateOf(6) }
     var historial by rememberSaveable { mutableStateOf(false) }
@@ -49,6 +51,9 @@ fun PasesQrScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit = {}
     val contexto = LocalContext.current
     val teclado = LocalSoftwareKeyboardController.current
     val alcance = rememberCoroutineScope()
+    val desplazamiento = rememberLazyListState()
+    LaunchedEffect(historial) { desplazamiento.scrollToItem(0) }
+    BackHandler(enabled = navegacionActiva && (historial || procesando)) { if (!procesando) historial = false }
     val activo = lista.firstOrNull { it.estado == "vigente" }
     suspend fun actualizar() {
         cargando = true
@@ -69,7 +74,7 @@ fun PasesQrScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit = {}
     LaunchedEffect(Unit) { actualizar() }
 
     LazyColumn(modifier.fillMaxSize().background(AlkiraCanvasBg).padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
+        state = desplazamiento, verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
