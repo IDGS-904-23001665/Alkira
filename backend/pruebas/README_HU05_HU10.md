@@ -53,6 +53,38 @@ Integración:
 
 ## Repetir las pruebas
 
+### Insertar datos ficticios para pruebas manuales
+
+`insertarDatosPruebaHu05Hu10.php` complementa **schema.sql**; no lo reemplaza ni lo importa.
+Después de cargar el esquema y `backend/database/modulo5.sql` y `modulo10.sql`
+en una base local con prefijo `alkira_pruebas_`, configura esa misma base en
+`backend/config/baseDatos.local.php` y ejecuta desde la raíz:
+
+Los SQL originales apuntan a `alkira`: para crear esta base aislada, adapta las
+sentencias `CREATE DATABASE` y `USE` en copias locales de los SQL al nombre de pruebas
+antes de importarlos; no los importes sobre una base de trabajo existente.
+
+```powershell
+php backend/pruebas/insertarDatosPruebaHu05Hu10.php --base=alkira_pruebas_demo
+```
+
+Inserta tres cuentas ficticias (administrador y guardia para web; residente/inquilino
+para móvil), un inmueble `[DEMO HU05 HU10]`, su unidad `DEMO-01`, la relación del residente,
+dos incidencias (reportada/en revisión) y tres pases (vigente 24 horas, vencido y revocado).
+Los tokens son aleatorios y las fechas se calculan con el reloj de MySQL. No agrega
+evidencias falsas, entradas/salidas, tickets ni datos de otros módulos.
+
+La salida correcta muestra **únicamente los tres correos y sus contraseñas**:
+12 caracteres aleatorios fáciles de escribir, diferentes por cuenta. No se guardan
+en archivos; en MySQL se almacena solo su hash. No compartas la salida en Git.
+Al repetir, renueva las contraseñas demo sin duplicar ejemplos ni reiniciar sus estados,
+vigencias o movimientos; puedes generar nuevos pases desde la aplicación.
+No modifica las cuentas originales del esquema ni borra registros. Toda la inserción
+es transaccional. Solo acepta MySQL local, bases con prefijo `alkira_pruebas_`
+y exige indicar el nombre de la base configurada;
+úsalo en tu entorno de pruebas, nunca en una instalación con datos reales.
+No se ejecuta al arrancar la aplicación ni al hacer merge. Ayuda: `--ayuda`.
+
 Requiere PHP con PDO MySQL, curl, fileinfo y mbstring; MySQL local accesible; Node y dependencias AWP instaladas. Las credenciales locales deben poder crear una base efímera. El ejecutor no expone credenciales ni usa las contraseñas de usuarios reales.
 
 Desde `AWP/`:
