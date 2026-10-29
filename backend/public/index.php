@@ -11,6 +11,7 @@ require_once dirname(__DIR__) . '/controllers/InmueblesControlador.php';
 require_once dirname(__DIR__) . '/controllers/AdeudosControlador.php';
 require_once dirname(__DIR__) . '/controllers/HistorialContratosControlador.php';
 require_once dirname(__DIR__) . '/controllers/ResidentesControlador.php';
+require_once dirname(__DIR__) . '/services/AutenticacionSolicitud.php';
 require_once dirname(__DIR__) . '/controllers/AccesosQrControlador.php';
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
@@ -114,7 +115,7 @@ try {
     }
 
     if ($rutaHu10) {
-        $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
+        $usuario = AutenticacionSolicitud::usuario($servicio);
         if ($usuario === null) {
             http_response_code(401);
             echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);

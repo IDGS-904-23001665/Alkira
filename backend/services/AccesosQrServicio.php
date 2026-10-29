@@ -25,6 +25,11 @@ final class AccesosQrServicio
         return $this->repositorio->listarBitacora();
     }
 
+    public function perteneceAlUsuario(int $idPase, int $idUsuario): bool
+    {
+        return $this->repositorio->perteneceAlUsuario($idPase, $idUsuario);
+    }
+
     public function generarPase(array $entrada, int $idUsuarioSesion): array
     {
         $idAnfitrion = isset($entrada['idUsuarioAnfitrion']) && is_numeric($entrada['idUsuarioAnfitrion'])

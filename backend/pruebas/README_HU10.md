@@ -18,4 +18,29 @@ El spec no debe ejecutarse directamente contra una base real.
 
 Usar los objetos de `modulo10.sql` en la base destino; no reimportar `schema.sql`
 sobre datos existentes. Falta comprobar la cámara física de caseta; el lector fue
-probado con video simulado. Móvil queda para la siguiente fase.
+probado con video simulado.
+
+## Móvil implementado y probado
+
+`PasesQrScreen` permite generar pases temporales, consultar solo los propios,
+mostrar un QR real, preparar su imagen PNG para compartir y revocar con confirmación.
+El backend acepta JWT Bearer, toma el anfitrión de la sesión y bloquea la suplantación,
+la revocación ajena y el acceso del residente a validación/bitácora de caseta.
+
+Verificado en Samsung SM-A035M (Android 13): creación/listado/revocación,
+decodificación de la imagen compartible y formulario Compose con QR y revocación.
+El pase creado por Android se validó después en caseta: ENTRADA, SALIDA, RECHAZADO.
+No se envió ninguna imagen ni mensaje a terceros durante las pruebas.
+
+Con `JAVA_HOME`, `ANDROID_HOME` y `ANDROID_SERIAL` configurados:
+
+```powershell
+php backend/pruebas/integracionHu05Hu10.php --android
+```
+
+Usa una app separada `com.alkira.movil.pruebas`, conexión USB y base efímera;
+retira las apps/datos de prueba al terminar. No reemplaza la instalación normal.
+`--android --solo-android` repite solo instrumentación y el enlace con caseta.
+La URL permanece centralizada en `ConfiguracionApi`; se configura al compilar con
+`-PalkiraApiUrl=http://IP_DE_LA_PC:8000`. El predeterminado anterior del equipo
+se conserva: proporcionar una URL local cuando se use otra red.

@@ -19,6 +19,7 @@ coverage/
 
 # Android Studio y Gradle
 .gradle/
+.kotlin/
 build/
 local.properties
 *.iml

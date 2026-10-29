@@ -66,6 +66,15 @@ final class AccesosQrRepositorio
         return (string) $this->conexion->query('SELECT NOW()')->fetchColumn();
     }
 
+    public function perteneceAlUsuario(int $idPase, int $idUsuario): bool
+    {
+        $consulta = $this->conexion->prepare('SELECT id_usuario_anfitrion FROM pases_acceso_qr WHERE id_pase = ?');
+        $consulta->execute([$idPase]);
+        $anfitrion = $consulta->fetchColumn();
+        if ($anfitrion === false) throw new OutOfBoundsException('Pase QR no encontrado.');
+        return (int) $anfitrion === $idUsuario;
+    }
+
     public function anfitrionActivo(int $idUsuario): bool
     {
         $consulta = $this->conexion->prepare("SELECT 1 FROM usuarios WHERE id_usuario = ? AND activo = 1 AND estado = 'activo' AND tipo_usuario IN ('inquilino', 'propietario')");
