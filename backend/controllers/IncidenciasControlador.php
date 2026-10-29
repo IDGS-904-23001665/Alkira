@@ -17,9 +17,30 @@ final class IncidenciasControlador
         try {
             $idSesion = (int) ($this->usuarioSesion['idUsuario'] ?? 0);
 
-            if ($idSesion < 1 || ($this->usuarioSesion['tipoUsuario'] ?? '') !== 'administrador') {
-                $this->responder(403, ['mensaje' => 'Solo administración puede gestionar incidencias.']);
+            $esAdmin = ($this->usuarioSesion['tipoUsuario'] ?? '') === 'administrador';
+            $esResidente = in_array($this->usuarioSesion['tipoUsuario'] ?? '', ['inquilino', 'propietario'], true);
+            if ($idSesion < 1 || (!$esAdmin && !$esResidente)) {
+                $this->responder(403, ['mensaje' => 'No tienes permisos para gestionar incidencias.']);
                 return;
+            }
+            if (!$esAdmin && isset($_GET['idUsuario']) && (string) $_GET['idUsuario'] !== (string) $idSesion) {
+                $this->responder(403, ['mensaje' => 'Solo puedes consultar tus propios reportes.']);
+                return;
+            }
+            if ($metodo === 'GET' && $ruta === '/api/incidencias/unidades') {
+                $this->responder(200, ['unidades' => $this->servicio->listarUnidadesPorUsuario($idSesion)]);
+                return;
+            }
+            if (!$esAdmin && preg_match('#^/api/incidencias/([1-9][0-9]*)#D', $ruta, $identificador)) {
+                if (!in_array($metodo, ['GET', 'POST'], true) || str_ends_with($ruta, '/estado')) {
+                    $this->responder(403, ['mensaje' => 'Solo administración puede categorizar o cambiar estados.']);
+                    return;
+                }
+                $incidencia = $this->servicio->buscar((int) $identificador[1]);
+                if ((int) $incidencia['idUsuarioReporta'] !== $idSesion) {
+                    $this->responder(403, ['mensaje' => 'No puedes acceder a un reporte de otro residente.']);
+                    return;
+                }
             }
             if ($metodo === 'GET' && preg_match('#^/api/incidencias/([1-9][0-9]*)/evidencias/([1-9][0-9]*)/archivo$#D', $ruta, $ids)) {
                 foreach ($this->servicio->listarEvidencias((int) $ids[1]) as $evidencia) {
@@ -37,6 +58,10 @@ final class IncidenciasControlador
             }
 
             if ($metodo === 'GET' && $ruta === '/api/incidencias') {
+                if (!$esAdmin) {
+                    $this->responder(200, ['incidencias' => $this->servicio->listarPorUsuario($idSesion)]);
+                    return;
+                }
                 if (isset($_GET['idUsuario']) && is_numeric($_GET['idUsuario'])) {
                     $this->responder(200, [
                         'incidencias' => $this->servicio->listarPorUsuario((int) $_GET['idUsuario']),
@@ -58,6 +83,13 @@ final class IncidenciasControlador
 
             if ($metodo === 'POST' && $ruta === '/api/incidencias') {
                 $entrada = $this->leerEntrada($archivoGuardado);
+                if (!$esAdmin) {
+                    if (isset($entrada['idUsuarioReporta']) && (string) $entrada['idUsuarioReporta'] !== (string) $idSesion) {
+                        $this->responder(403, ['mensaje' => 'No puedes reportar en nombre de otro residente.']);
+                        return;
+                    }
+                    $entrada['idUsuarioReporta'] = $idSesion;
+                }
                 $incidencia = $this->servicio->crear($entrada, $idSesion);
                 $archivoGuardado = null;
                 $this->responder(201, ['incidencia' => $incidencia]);

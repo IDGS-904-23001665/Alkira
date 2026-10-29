@@ -132,6 +132,7 @@ try {
         if ($listo) { fclose($listo); break; }
         usleep(100000);
     }
+    if (!in_array('--solo-android', $argv, true)) {
     comprobar(solicitar('GET', '/api/salud')[0] === 200, 'salud HTTP');
     foreach (($hu10 ? ['admin' => 'admin', 'guardia' => 'guardia'] : ['admin' => 'admin']) as $rol => $correo) {
         $respuesta = solicitar('POST', '/api/auth/login', ['correo' => $correo . '@alkira.test', 'contrasena' => $password]);
@@ -238,6 +239,66 @@ try {
     comprobar($movil[0] === 200, 'regresión autenticación Bearer existente');
     foreach (['/api/auth/yo-movil', '/api/adeudos/pendientes', '/api/pagos/historial', '/api/contratos'] as $ruta) {
         comprobar(solicitar('GET', $ruta, null, null, $movil[1]['token'])[0] === 200, 'regresión ' . $ruta);
+    }
+    if ($hu05) {
+        $residente = $movil[1]['token'];
+        $otro = solicitar('POST', '/api/auth/login-movil', ['correo' => 'propietario@alkira.test', 'contrasena' => $password])[1]['token'];
+        $tecnico = solicitar('POST', '/api/auth/login-movil', ['correo' => 'tecnico@alkira.test', 'contrasena' => $password])[1]['token'];
+        comprobar(solicitar('GET', '/api/incidencias', null, null, $residente)[0] === 200, 'HU05 Bearer residente');
+        comprobar(solicitar('GET', '/api/incidencias?idUsuario=4', null, null, $residente)[0] === 403, 'HU05 no consultar otro residente');
+        comprobar(solicitar('GET', '/api/incidencias', null, null, $tecnico)[0] === 403, 'HU05 tecnico sin acceso');
+        $unidades = solicitar('GET', '/api/incidencias/unidades', null, null, $residente);
+        comprobar($unidades[0] === 200 && count($unidades[1]['unidades']) === 1 && (int) $unidades[1]['unidades'][0]['idUnidad'] === 1, 'HU05 unidades propias');
+        comprobar(solicitar('POST', '/api/incidencias', array_replace($reporte, ['idUsuarioReporta' => 4]), null, $residente)[0] === 403, 'HU05 no suplantar reportante');
+        $movilReporte = ['titulo' => 'QA movil propio', 'descripcion' => 'Desde Bearer', 'idUnidad' => 1, 'idInmueble' => 2, 'archivo' => new CURLFile($png, 'image/png', 'foto.png')];
+        $creado = solicitar('POST', '/api/incidencias', $movilReporte, null, $residente);
+        comprobar($creado[0] === 201 && (int) $creado[1]['incidencia']['idUsuarioReporta'] === 3, 'HU05 reporte multipart desde movil');
+        $idMovil = (int) $creado[1]['incidencia']['idIncidencia'];
+        comprobar(solicitar('GET', "/api/incidencias/$idMovil", null, null, $otro)[0] === 403, 'HU05 detalle ajeno protegido');
+        comprobar(solicitar('POST', "/api/incidencias/$idMovil/evidencias", ['rutaArchivo' => 'https://example.invalid/a.png'], null, $otro)[0] === 403, 'HU05 evidencia ajena protegida');
+        comprobar(solicitar('PATCH', "/api/incidencias/$idMovil/estado", ['estado' => 'cerrada'], null, $residente)[0] === 403, 'HU05 residente no cambia estado');
+        $misReportes = solicitar('GET', '/api/incidencias', null, null, $otro)[1]['incidencias'];
+        comprobar(count(array_filter($misReportes, fn($r) => (int) $r['idUsuarioReporta'] !== 4)) === 0, 'HU05 listado sin datos de otros');
+    }
+    }
+    if (in_array('--android', $argv, true)) {
+        $sdk = getenv('ANDROID_HOME') ?: (getenv('LOCALAPPDATA') . '/Android/Sdk');
+        $adb = $sdk . '/platform-tools/adb.exe';
+        $serial = getenv('ANDROID_SERIAL');
+        if (!$serial) throw new RuntimeException('Define ANDROID_SERIAL para probar solamente el dispositivo autorizado.');
+        $puerto = (int) explode(':', $direccion)[1];
+        $reverso = proc_open([$adb, '-s', $serial, 'reverse', 'tcp:8000', 'tcp:' . $puerto], [0 => STDIN, 1 => STDOUT, 2 => STDERR], $p);
+        if (proc_close($reverso) !== 0) throw new RuntimeException('No se pudo conectar Android al backend efimero por USB.');
+        try {
+            $env = getenv();
+            $ejecutar = function (array $comando, string $tarea) use ($temporal, $raiz, $env): string {
+                $log = $temporal . '/android.log';
+                $proceso = proc_open($comando, [0 => STDIN, 1 => ['file', $log, 'w'], 2 => ['file', $log, 'a']], $canales, $raiz . '/movil', $env);
+                $codigo = proc_close($proceso);
+                $texto = file_get_contents($log);
+                if ($codigo !== 0) { echo implode("\n", array_slice(explode("\n", $texto), -35)) . "\n"; throw new RuntimeException($tarea); }
+                return $texto;
+            };
+            $ejecutar(['cmd', '/c', $raiz . '/movil/gradlew.bat', ':app:assembleDebug', ':app:assembleDebugAndroidTest',
+                '-PalkiraPruebas=true', '-PalkiraApiUrl=http://127.0.0.1:8000', '--offline', '--console=plain'], 'Compilar APKs de prueba Android');
+            $ejecutar([$adb, '-s', $serial, 'install', '-r', '-t', $raiz . '/movil/app/build/outputs/apk/debug/app-debug.apk'], 'Instalar app de pruebas separada');
+            $ejecutar([$adb, '-s', $serial, 'install', '-r', '-t', $raiz . '/movil/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk'], 'Instalar instrumentacion');
+            $ejecutar([$adb, '-s', $serial, 'reverse', 'tcp:8000', 'tcp:' . $puerto], 'Restablecer conexion USB despues de instalar');
+            $resultado = $ejecutar([$adb, '-s', $serial, 'shell', 'am', 'instrument', '-w', '-r', '-e', 'alkiraPrueba', 'true', '-e', 'alkiraClave', $password,
+                'com.alkira.movil.pruebas.test/androidx.test.runner.AndroidJUnitRunner'], 'Ejecutar pruebas en Android');
+            if (preg_match('/OK \((\d+) tests?\)/', $resultado, $resumen)) echo 'Android: ' . $resumen[1] . " pruebas correctas.\n";
+            else {
+                foreach (explode("\n", $resultado) as $linea) if (preg_match('/Exception:|Error:|Caused by:|failed to connect|FAILURES|Tests run:|AssertionError/', $linea)) echo $linea . "\n";
+            }
+            comprobar(str_contains($resultado, 'OK (') && !str_contains($resultado, 'FAILURES!!!') && !str_contains($resultado, 'INSTRUMENTATION_FAILED'), 'Android fisico: interfaz y API real');
+        } finally {
+            foreach (['com.alkira.movil.pruebas.test', 'com.alkira.movil.pruebas'] as $paquete) {
+                $borrar = proc_open([$adb, '-s', $serial, 'uninstall', $paquete], [0 => STDIN, 1 => ['file', $temporal . '/limpieza-android.log', 'a'], 2 => ['file', $temporal . '/limpieza-android.log', 'a']], $p);
+                proc_close($borrar);
+            }
+            $limpieza = proc_open([$adb, '-s', $serial, 'reverse', '--remove', 'tcp:8000'], [0 => STDIN, 1 => STDOUT, 2 => STDERR], $p);
+            proc_close($limpieza);
+        }
     }
     if ($conWeb) {
         $env = getenv(); $env['CYPRESS_TEST_PASSWORD'] = $password; $env['CYPRESS_TEST_BASE_URL'] = $base; $env['CYPRESS_HU05_PRESENT'] = $hu05 ? 'true' : 'false';

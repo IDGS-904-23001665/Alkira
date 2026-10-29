@@ -182,6 +182,21 @@ final class IncidenciasRepositorio
             throw new InvalidArgumentException('Selecciona la unidad correspondiente al inmueble.');
         }
     }
+
+    public function listarUnidadesPorUsuario(int $idUsuario): array
+    {
+        $consulta = $this->conexion->prepare(
+            'SELECT DISTINCT pu.id_unidad AS idUnidad, pu.id_inmueble AS idInmueble,
+                pu.numero_unidad AS numeroUnidad, i.nombre AS nombreInmueble
+             FROM usuarios_propiedades up JOIN propiedades_unidades pu ON pu.id_unidad = up.id_unidad
+             JOIN inmuebles i ON i.id_inmueble = pu.id_inmueble
+             WHERE up.id_usuario = ? AND up.fecha_inicio <= CURRENT_DATE()
+                AND (up.fecha_fin IS NULL OR up.fecha_fin >= CURRENT_DATE())
+                AND pu.activo = 1 AND i.activo = 1 ORDER BY pu.numero_unidad'
+        );
+        $consulta->execute([$idUsuario]);
+        return $consulta->fetchAll(PDO::FETCH_ASSOC);
+    }
     private function transaccion(callable $accion): mixed
     {
         $propia = !$this->conexion->inTransaction();

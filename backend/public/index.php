@@ -12,6 +12,7 @@ require_once dirname(__DIR__) . '/controllers/AdeudosControlador.php';
 require_once dirname(__DIR__) . '/controllers/HistorialContratosControlador.php';
 require_once dirname(__DIR__) . '/controllers/IncidenciasControlador.php';
 require_once dirname(__DIR__) . '/controllers/ResidentesControlador.php';
+require_once dirname(__DIR__) . '/services/AutenticacionSolicitud.php';
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -27,6 +28,7 @@ $rutaResidentes = $ruta === '/api/incidencias/residentes';
 
 $rutaHu05 = is_string($ruta) && (
     $ruta === '/api/incidencias'
+    || $ruta === '/api/incidencias/unidades'
     || preg_match('#^/api/incidencias/[1-9][0-9]*(?:/evidencias(?:/[1-9][0-9]*/archivo)?|/estado)?$#D', $ruta) === 1
 );
 
@@ -112,15 +114,10 @@ try {
     }
 
     if ($rutaHu05) {
-        $usuario = $servicio->verificarToken($_COOKIE['alkira_token'] ?? null);
+        $usuario = AutenticacionSolicitud::usuario($servicio);
         if ($usuario === null) {
             http_response_code(401);
             echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);
-            exit;
-        }
-        if ($usuario['tipoUsuario'] !== 'administrador') {
-            http_response_code(403);
-            echo json_encode(['mensaje' => 'Solo administración puede gestionar incidencias.']);
             exit;
         }
         $controladorIncidencias = new IncidenciasControlador(

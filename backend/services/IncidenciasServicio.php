@@ -48,6 +48,11 @@ final class IncidenciasServicio
         return $this->repositorio->listarResidentesActivos();
     }
 
+    public function listarUnidadesPorUsuario(int $idUsuario): array
+    {
+        return $this->repositorio->listarUnidadesPorUsuario($idUsuario);
+    }
+
     public function crear(array $entrada, int $idUsuarioSesion): array
     {
         $idUsuario = isset($entrada['idUsuarioReporta']) && is_numeric($entrada['idUsuarioReporta'])
