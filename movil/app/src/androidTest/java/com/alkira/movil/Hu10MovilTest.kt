@@ -56,7 +56,12 @@ class Hu10MovilTest {
         pantalla.waitUntil(30_000) { pantalla.onAllNodes(hasText("Generar pase") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         pantalla.onNodeWithText("Generar pase").performClick()
         pantalla.waitUntil(30_000) { pantalla.onAllNodesWithContentDescription("Código QR del pase").fetchSemanticsNodes().isNotEmpty() }
+        capturar("hu10-qr")
         pantalla.onNodeWithText("Cerrar").performClick()
+        pantalla.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+        pantalla.waitUntil(30_000) { pantalla.onAllNodesWithContentDescription("Código QR del pase activo").fetchSemanticsNodes().isNotEmpty() }
+        capturar("hu10-diseno")
+        pantalla.onNodeWithText("Mis pases").performClick()
         pantalla.onNode(hasScrollToIndexAction()).performScrollToIndex(3)
         pantalla.onAllNodesWithText("Revocar").onFirst().performClick()
         pantalla.onNodeWithText("Confirmar revocación").performClick()
@@ -65,5 +70,11 @@ class Hu10MovilTest {
         assertEquals("revocado", PasesQrApi.listar().first { it.visitante == "QA Samsung formulario HU10" }.estado)
         // Se deja un pase efímero para verificar Android -> caseta en el ejecutor PHP.
         PasesQrApi.generar("QA Samsung caseta HU10", 2)
+    }
+
+    private fun capturar(nombre: String) {
+        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
+            "screencap -p /data/local/tmp/alkira-$nombre.png"
+        ).let { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).use { salida -> salida.readBytes() } }
     }
 }
