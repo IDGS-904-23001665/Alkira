@@ -17,7 +17,7 @@ final class AutenticacionControlador
             return;
         }
 
-        $usuario = $this->servicio->ingresar($datos['correo'], $datos['contrasena']);
+        $usuario = $this->servicio->ingresarWeb($datos['correo'], $datos['contrasena']);
         if ($usuario === null) {
             $this->responder(401, ['mensaje' => 'Correo o contraseña incorrectos.']);
             return;
@@ -51,7 +51,7 @@ final class AutenticacionControlador
 
     public function sesion(): void
     {
-        $usuario = $this->servicio->verificarToken($_COOKIE['alkira_token'] ?? null);
+        $usuario = $this->servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
         if ($usuario === null) {
             $this->responder(401, ['mensaje' => 'Sesión no válida o vencida.']);
             return;

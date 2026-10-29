@@ -1,0 +1,66 @@
+/* Complementos específicos de Módulo 10 (Seguridad / Accesos QR) sobre la base estándar de Propiedades.css (.hu01) */
+
+.hu01-estado.vigente,
+.hu01-estado.en_interior,
+.hu01-estado.ENTRADA {
+  background: #e4f8ee;
+  color: #07975d;
+}
+
+.hu01-estado.utilizado,
+.hu01-estado.finalizada,
+.hu01-estado.SALIDA {
+  background: #e6f2ff;
+  color: #2563eb;
+}
+
+.hu01-estado.pendiente {
+  background: #fff3da;
+  color: #c08919;
+}
+
+.hu01-estado.vencido,
+.hu01-estado.revocado,
+.hu01-estado.RECHAZADO {
+  background: #ffe8e8;
+  color: #c53030;
+}
+
+.hu10-resultado-escaneo {
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-top: 16px;
+  border: 1px solid #dce5f2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.hu10-resultado-escaneo.ENTRADA {
+  background: #e8f9f0;
+  border-color: #bce9d3;
+  color: #087b50;
+}
+
+.hu10-resultado-escaneo.SALIDA {
+  background: #edf4ff;
+  border-color: #bfd6ff;
+  color: #1d4ed8;
+}
+
+.hu10-resultado-escaneo.RECHAZADO {
+  background: #fff0f0;
+  border-color: #f5cccc;
+  color: #a93642;
+}
+
+.hu10-token-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  background: #f4f7fc;
+  border: 1px solid #dfe6f2;
+  padding: 4px 8px;
+  border-radius: 5px;
+  color: #1d3154;
+}

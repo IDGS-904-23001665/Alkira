@@ -1,5 +1,7 @@
 package com.alkira.movil.red
 
+import com.alkira.movil.BuildConfig
+
 object ConfiguracionApi {
-    const val URL_BASE = "http://192.168.1.6:8000"
+    val URL_BASE: String get() = BuildConfig.API_URL
 }

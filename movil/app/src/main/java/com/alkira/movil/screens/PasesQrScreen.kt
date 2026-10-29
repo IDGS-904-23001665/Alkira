@@ -1,414 +1,221 @@
 package com.alkira.movil.screens
 
+import android.content.Intent
+import android.graphics.Bitmap
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.alkira.movil.red.PaseResidente
+import com.alkira.movil.red.PasesQrApi
 import com.alkira.movil.ui.theme.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
-fun PasesQrScreen(
-    modifier: Modifier = Modifier,
-    onNavigateBack: () -> Unit = {}
-) {
-    var visitorName by remember { mutableStateOf("Mariana López Ramírez") }
-    var licensePlate by remember { mutableStateOf("GTO-782-B") }
-    var selectedPassType by remember { mutableStateOf("Familiar / Amigos") }
-    var showFullQrModal by remember { mutableStateOf(false) }
-    var showShareModal by remember { mutableStateOf(false) }
+fun PasesQrScreen(modifier: Modifier = Modifier, onNavigateBack: () -> Unit = {}) {
+    var nombre by rememberSaveable { mutableStateOf("") }
+    var horas by rememberSaveable { mutableIntStateOf(6) }
+    var historial by rememberSaveable { mutableStateOf(false) }
+    var lista by remember { mutableStateOf<List<PaseResidente>>(emptyList()) }
+    var seleccionado by remember { mutableStateOf<PaseResidente?>(null) }
+    var revocar by remember { mutableStateOf<PaseResidente?>(null) }
+    var cargando by remember { mutableStateOf(true) }
+    var procesando by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var mensaje by remember { mutableStateOf<String?>(null) }
+    val contexto = LocalContext.current
+    val teclado = LocalSoftwareKeyboardController.current
+    val alcance = rememberCoroutineScope()
+    val activo = lista.firstOrNull { it.estado == "vigente" }
+    suspend fun actualizar() {
+        cargando = true
+        try { lista = PasesQrApi.listar(); error = null }
+        catch (e: CancellationException) { throw e }
+        catch (e: Exception) { error = e.message ?: "No se pudieron cargar tus pases." }
+        finally { cargando = false }
+    }
+    fun compartir(pase: PaseResidente) {
+        alcance.launch {
+            try {
+                val intent = withContext(Dispatchers.IO) { QrPase.prepararCompartir(contexto, pase) }
+                contexto.startActivity(Intent.createChooser(intent, "Compartir pase QR"))
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { error = e.message ?: "No se pudo compartir el pase." }
+        }
+    }
+    LaunchedEffect(Unit) { actualizar() }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(AlkiraCanvasBg)
-            .padding(horizontal = 20.dp, vertical = 16.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Encabezado
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Control de Accesos QR",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlkiraTextPrimary
-                )
-                Text(
-                    text = "Pases Temporales y Dinámicos",
-                    fontSize = 12.sp,
-                    color = AlkiraTextSecondary
-                )
-            }
-
-            // Status Pill de Garita
-            Surface(
-                color = AlkiraGreenSoft,
-                shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, AlkiraSuccessGreen.copy(alpha = 0.3f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.size(6.dp).background(AlkiraSuccessGreen, CircleShape))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Garita Activa",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AlkiraGreenText
-                    )
+    LazyColumn(modifier.fillMaxSize().background(AlkiraCanvasBg).padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 16.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (historial) "Mis pases" else "Control de Accesos QR", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AlkiraTextPrimary)
+                    Text("Pases Temporales y Dinámicos", fontSize = 12.sp, color = AlkiraTextSecondary)
                 }
+                InsigniaPase(if (historial) "Nuevo pase" else "Mis pases", Modifier.clickable(enabled = !procesando && !cargando) { historial = !historial })
             }
         }
-
-        // Card 1: Visor del Pase QR Dinámico (Inspirado en visor de documentos de ALKIRA OS)
-        Card(
-            colors = CardDefaults.cardColors(containerColor = AlkiraSurfaceWhite),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, AlkiraBorderSubtle, RoundedCornerShape(16.dp))
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Pase de Acceso Activo",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlkiraTextPrimary
-                )
-                Text(
-                    text = "Torre B • Departamento 402",
-                    fontSize = 12.sp,
-                    color = AlkiraTextSecondary,
-                    modifier = Modifier.padding(bottom = 14.dp)
-                )
-
-                // Simulación gráfica de Código QR con estilo corporativo
-                Box(
-                    modifier = Modifier
-                        .size(170.dp)
-                        .background(AlkiraCanvasBg, RoundedCornerShape(12.dp))
-                        .border(2.dp, AlkiraDarkNavy, RoundedCornerShape(12.dp))
-                        .clickable { showFullQrModal = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "☵ [ QR ] ☲",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AlkiraDarkNavy
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Toca para pantalla completa",
-                            fontSize = 10.sp,
-                            color = AlkiraPrimaryBlue
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Token y Vigencia
-                Surface(
-                    color = AlkiraBlueSoft,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "TOKEN: ALK-9482-VIS",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AlkiraBlueBadgeText,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
-
-                Text(
-                    text = "Válido hoy hasta las 23:59 hrs • Un solo uso",
-                    fontSize = 11.sp,
-                    color = AlkiraTextSecondary,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-
-                // Acciones rápidas de compartir
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { showFullQrModal = true },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                    ) {
-                        Text("Ver Ampliado", fontSize = 12.sp, color = AlkiraDarkNavy)
-                    }
-                    Button(
-                        onClick = { showShareModal = true },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AlkiraPrimaryBlue),
-                        contentPadding = PaddingValues(vertical = 8.dp)
-                    ) {
-                        Text("Compartir", fontSize = 12.sp)
+        if (error != null || mensaje != null || cargando) item {
+            error?.let { Text(it, color = AlkiraDangerRed, fontSize = 12.sp) }
+            mensaje?.let { Text(it, color = AlkiraPrimaryBlue, fontSize = 12.sp) }
+            if (cargando) LinearProgressIndicator(Modifier.fillMaxWidth(), color = AlkiraPrimaryBlue)
+        }
+        if (historial) {
+            item {
+                TextButton(onClick = { alcance.launch { actualizar() } }, enabled = !procesando && !cargando,
+                    colors = ButtonDefaults.textButtonColors(contentColor = AlkiraPrimaryBlue)) { Text("Actualizar") }
+                if (!cargando && lista.isEmpty()) Text("Aún no tienes pases registrados.", color = AlkiraTextSecondary)
+            }
+            items(lista, key = { it.id }) { pase ->
+                TarjetaPase {
+                    Text(pase.visitante, fontWeight = FontWeight.Bold, color = AlkiraTextPrimary)
+                    Text("Estado: ${pase.estado}", color = AlkiraTextSecondary, fontSize = 12.sp)
+                    Text("Hasta: ${pase.fin}", color = AlkiraTextSecondary, fontSize = 12.sp)
+                    if (pase.estado == "vigente") Row {
+                        TextButton(onClick = { seleccionado = pase }, enabled = !procesando) { Text("Ver QR", color = AlkiraPrimaryBlue) }
+                        TextButton(onClick = { revocar = pase }, enabled = !procesando) { Text("Revocar", color = AlkiraDangerRed) }
                     }
                 }
             }
-        }
-
-        // Card 2: Formulario para Generar Nuevo Pase
-        Card(
-            colors = CardDefaults.cardColors(containerColor = AlkiraSurfaceWhite),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, AlkiraBorderSubtle, RoundedCornerShape(16.dp))
-        ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                Text(
-                    text = "Registrar Nueva Visita",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlkiraTextPrimary,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
-                OutlinedTextField(
-                    value = visitorName,
-                    onValueChange = { visitorName = it },
-                    label = { Text("Nombre Completo del Visitante") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 10.dp)
-                )
-
-                OutlinedTextField(
-                    value = licensePlate,
-                    onValueChange = { licensePlate = it },
-                    label = { Text("Placas del Vehículo (Opcional)") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp)
-                )
-
-                Text(
-                    text = "Tipo de Acceso:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AlkiraTextPrimary,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
-
-                // Selector de Pills
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    listOf("Familiar / Amigos", "Paquetería", "Servicios").forEach { type ->
-                        val isSelected = selectedPassType == type
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = if (isSelected) AlkiraDarkNavy else AlkiraCanvasBg,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isSelected) AlkiraDarkNavy else AlkiraBorderSubtle
-                            ),
-                            modifier = Modifier.clickable { selectedPassType = type }
-                        ) {
-                            Text(
-                                text = type,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color.White else AlkiraTextSecondary,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
+        } else {
+            item {
+                TarjetaPase(centrar = true) {
+                    Text("Pase de Acceso Activo", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = AlkiraTextPrimary)
+                    Text(activo?.visitante ?: "Aún no hay un pase vigente", fontSize = 12.sp, color = AlkiraTextSecondary)
+                    CodigoPase(activo?.token, 170.dp, "Código QR del pase activo", Modifier.clickable(enabled = activo != null) { seleccionado = activo })
+                    if (activo != null) {
+                        Surface(color = AlkiraBlueSoft, shape = RoundedCornerShape(8.dp)) {
+                            Text("TOKEN: ${activo.token}", fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+                                color = AlkiraBlueBadgeText, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                        }
+                        Text("Hasta: ${activo.fin} · Un ciclo de entrada y salida", fontSize = 11.sp, color = AlkiraTextSecondary)
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { seleccionado = activo }, enabled = activo != null && !procesando,
+                            modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) { Text("Ver Ampliado", fontSize = 12.sp, color = AlkiraDarkNavy) }
+                        Button(onClick = { activo?.let(::compartir) }, enabled = activo != null && !procesando,
+                            modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AlkiraPrimaryBlue, contentColor = Color.White)) { Text("Compartir", fontSize = 12.sp) }
+                    }
+                }
+            }
+            item {
+                TarjetaPase {
+                    Text("Registrar Nueva Visita", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AlkiraTextPrimary)
+                    OutlinedTextField(nombre, { if (it.length <= 150) nombre = it }, label = { Text("Nombre del visitante") },
+                        modifier = Modifier.fillMaxWidth(), enabled = !procesando, singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = AlkiraTextPrimary, unfocusedTextColor = AlkiraTextPrimary,
+                            focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, focusedBorderColor = AlkiraPrimaryBlue,
+                            unfocusedBorderColor = AlkiraBorderSubtle, focusedLabelColor = AlkiraPrimaryBlue, unfocusedLabelColor = AlkiraTextSecondary))
+                    Text("Vigencia del pase:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AlkiraTextPrimary)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(2, 6, 12, 24, 48).forEach { valor ->
+                            Surface(shape = RoundedCornerShape(20.dp), color = if (horas == valor) AlkiraDarkNavy else AlkiraCanvasBg,
+                                border = BorderStroke(1.dp, if (horas == valor) AlkiraDarkNavy else AlkiraBorderSubtle),
+                                modifier = Modifier.clickable(enabled = !procesando) { horas = valor }) {
+                                Text("$valor h", fontSize = 11.sp, fontWeight = if (horas == valor) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (horas == valor) Color.White else AlkiraTextSecondary, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                            }
                         }
                     }
+                    Button(onClick = {
+                        teclado?.hide(); procesando = true; error = null; mensaje = null
+                        alcance.launch {
+                            try {
+                                val pase = PasesQrApi.generar(nombre, horas)
+                                nombre = ""; seleccionado = pase; mensaje = "Pase #${pase.id} generado."
+                                actualizar()
+                            } catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { error = e.message ?: "No se pudo generar el pase." }
+                            finally { procesando = false }
+                        }
+                    }, enabled = !procesando && !cargando && nombre.isNotBlank(), modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp), colors = ButtonDefaults.buttonColors(containerColor = AlkiraPrimaryBlue, contentColor = Color.White)) {
+                        Text(if (procesando) "Generando…" else "Generar pase", fontWeight = FontWeight.Bold)
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = { showFullQrModal = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AlkiraPrimaryBlue)
-                ) {
-                    Text("Generar Pase de Acceso", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
+        item { TextButton(onClick = onNavigateBack, colors = ButtonDefaults.textButtonColors(contentColor = AlkiraPrimaryBlue)) { Text("Volver al inicio") } }
+    }
+    seleccionado?.let { pase ->
+        Dialog(onDismissRequest = { seleccionado = null }) {
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = Color.White) {
+                Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    InsigniaPase("PASE ${pase.estado.uppercase()}")
+                    CodigoPase(pase.token, 200.dp, "Código QR del pase")
+                    Text(pase.visitante, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AlkiraTextPrimary)
+                    Text("Válido de ${pase.inicio} a ${pase.fin}.", fontSize = 12.sp, color = AlkiraTextSecondary)
+                    Text("La caseta confirma la vigencia y registra entrada y salida.", fontSize = 11.sp, color = AlkiraTextSecondary)
+                    Button(onClick = { seleccionado = null }, modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AlkiraDarkNavy, contentColor = Color.White)) { Text("Cerrar") }
                 }
             }
         }
     }
-
-    // ==========================================
-    // SUBVENTANA 1: Modal de QR a Pantalla Completa (Modo Garita)
-    // ==========================================
-    if (showFullQrModal) {
-        Dialog(onDismissRequest = { showFullQrModal = false }) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = AlkiraSurfaceWhite,
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Surface(
-                        color = AlkiraGreenSoft,
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Text(
-                            text = "● ACCESO VÁLIDO PARA GARITA",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AlkiraGreenText,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // QR Grande
-                    Box(
-                        modifier = Modifier
-                            .size(200.dp)
-                            .background(Color.White)
-                            .border(3.dp, AlkiraDarkNavy, RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "█▀▀▀▀█ ▄▄ █▀▀▀▀█\n█ ██ █ █▄ █ ██ █\n█ ▀▀ █ ▄▄ █ ▀▀ █\n▀▀▀▀▀▀ ▀▀ ▀▀▀▀▀▀\n▀▄▄▀▄█ █▀ ▀█▄▀▄█\n█▀▀▀▀█ ▄▄ ▄▄▄▄▄▄\n█ ██ █ █▄ █▄█ █▄\n█ ▀▀ █ ▄▄ ▄ ▄▀▄█",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            color = Color.Black
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = visitorName,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AlkiraTextPrimary
-                    )
-                    Text(
-                        text = "Vehículo: $licensePlate • Tipo: $selectedPassType",
-                        fontSize = 12.sp,
-                        color = AlkiraTextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Button(
-                        onClick = { showFullQrModal = false },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = AlkiraDarkNavy)
-                    ) {
-                        Text("Cerrar")
-                    }
+    revocar?.let { pase ->
+        AlertDialog(onDismissRequest = { if (!procesando) revocar = null }, containerColor = Color.White,
+            title = { Text("¿Revocar este pase?", color = AlkiraTextPrimary) },
+            text = { Text("El pase de ${pase.visitante} dejará de autorizar nuevas entradas.", color = AlkiraTextSecondary) },
+            confirmButton = { TextButton(enabled = !procesando, onClick = {
+                procesando = true
+                alcance.launch {
+                    try { PasesQrApi.revocar(pase.id); revocar = null; mensaje = "Pase revocado."; actualizar() }
+                    catch (e: CancellationException) { throw e }
+                    catch (e: Exception) { error = e.message ?: "No se pudo revocar el pase."; revocar = null }
+                    finally { procesando = false }
                 }
-            }
-        }
-    }
-
-    // ==========================================
-    // SUBVENTANA 2: Modal de Compartir Pase
-    // ==========================================
-    if (showShareModal) {
-        Dialog(onDismissRequest = { showShareModal = false }) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = AlkiraSurfaceWhite,
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(
-                        text = "Compartir Pase QR",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AlkiraTextPrimary
-                    )
-                    Text(
-                        text = "Envía el enlace de acceso directo al visitante",
-                        fontSize = 12.sp,
-                        color = AlkiraTextSecondary,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    Surface(
-                        color = AlkiraCanvasBg,
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "https://alkira.app/pass/ALK-9482-VIS",
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = AlkiraPrimaryBlue,
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { showShareModal = false },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Copiar", color = AlkiraTextPrimary)
-                        }
-                        Button(
-                            onClick = { showShareModal = false },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = AlkiraSuccessGreen)
-                        ) {
-                            Text("WhatsApp", color = Color.White)
-                        }
-                    }
-                }
-            }
-        }
+            }) { Text("Confirmar revocación", color = AlkiraDangerRed) } },
+            dismissButton = { TextButton(enabled = !procesando, onClick = { revocar = null }) { Text("Cancelar", color = AlkiraPrimaryBlue) } })
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun PasesQrScreenPreview() {
-    PantallasMovilTheme {
-        PasesQrScreen()
+private fun TarjetaPase(centrar: Boolean = false, contenido: @Composable ColumnScope.() -> Unit) {
+    Card(Modifier.fillMaxWidth().border(1.dp, AlkiraBorderSubtle, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+        Column(Modifier.fillMaxWidth().padding(if (centrar) 20.dp else 18.dp),
+            horizontalAlignment = if (centrar) Alignment.CenterHorizontally else Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(10.dp), content = contenido)
+    }
+}
+
+@Composable
+private fun InsigniaPase(texto: String, modifier: Modifier = Modifier) {
+    Surface(modifier, color = AlkiraGreenSoft, shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, AlkiraSuccessGreen.copy(alpha = .3f))) {
+        Text(texto, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AlkiraGreenText, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+    }
+}
+
+@Composable
+private fun CodigoPase(token: String?, tamano: Dp, descripcion: String, modifier: Modifier = Modifier) = key(token) {
+    val bitmap by produceState<Bitmap?>(null) { value = withContext(Dispatchers.Default) { token?.let(QrPase::crear) } }
+    Box(modifier.size(tamano).background(Color.White, RoundedCornerShape(12.dp)).border(2.dp, AlkiraDarkNavy, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+        bitmap?.let { Image(it.asImageBitmap(), descripcion, Modifier.fillMaxSize().padding(4.dp)) }
+            ?: Text(if (token == null) "Genera tu primer pase" else "Preparando QR…", fontSize = 12.sp, color = AlkiraTextSecondary)
     }
 }

@@ -14,9 +14,12 @@ coverage/
 
 # Credenciales locales de Cypress
 /AWP/cypress.env.json
+/AWP/cypress/screenshots/
+/AWP/cypress/videos/
 
 # Android Studio y Gradle
 .gradle/
+.kotlin/
 build/
 local.properties
 *.iml
