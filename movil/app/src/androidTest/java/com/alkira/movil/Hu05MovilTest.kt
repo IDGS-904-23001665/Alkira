@@ -46,14 +46,20 @@ class Hu05MovilTest {
             } catch (e: ErrorApi) { assertEquals(403, e.codigoHttp) }
 
             pantalla.setContent { PantallasMovilTheme { IncidenciasScreen() } }
-            pantalla.onNodeWithText("Título").performTextInput("QA Samsung formulario HU05")
-            pantalla.onNodeWithText("Descripción").performTextInput("Reporte enviado desde la pantalla real")
-            pantalla.onNodeWithText("Enviar reporte").performScrollTo()
-            pantalla.waitUntil(30_000) { pantalla.onAllNodes(hasText("Enviar reporte") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-            pantalla.onNodeWithText("Enviar reporte").performClick()
+            pantalla.waitUntil(30_000) { pantalla.onAllNodes(hasText("Mis reportes") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
+                "screencap -p /data/local/tmp/alkira-hu05-diseno.png"
+            ).use { java.io.FileInputStream(it.fileDescriptor).use { salida -> salida.readBytes() } }
+            pantalla.onNodeWithContentDescription("Título").performTextInput("QA Samsung formulario HU05")
+            pantalla.onNodeWithContentDescription("Descripción").performTextInput("Reporte enviado desde la pantalla real")
+            pantalla.waitUntil(30_000) { pantalla.onAllNodes(hasText("Enviar Reporte") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+            pantalla.onNodeWithText("Enviar Reporte").performClick()
             pantalla.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
             pantalla.waitUntil(30_000) { pantalla.onAllNodes(hasText("enviado correctamente", substring = true)).fetchSemanticsNodes().isNotEmpty() }
-            pantalla.onNodeWithText("Título").assertTextContains("")
+            pantalla.onNodeWithContentDescription("Título").assertTextEquals("")
+            pantalla.onNodeWithText("Mis reportes").performClick()
+            pantalla.onNode(hasScrollToIndexAction()).performScrollToIndex(2)
+            pantalla.onNodeWithText("QA Samsung formulario HU05", substring = true).assertExists()
         } finally { archivo.delete() }
     }
 }
