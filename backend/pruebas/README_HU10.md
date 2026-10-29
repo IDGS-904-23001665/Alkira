@@ -13,8 +13,9 @@ HU05 conserva su rama independiente. La integración en main queda para después
 
 Desde AWP: `npm ci`, `npm run lint` y `npm run build`.
 Desde la raíz: `php backend/pruebas/integracionHu05Hu10.php --web`.
-El ejecutor detecta ahora ambas historias. Su ejecución conjunta corresponde al
-paso 3 y queda pendiente; en este paso solo se prepara la integración.
+El ejecutor detecta ambas historias. La integración se verificó comparando todo
+el código y las pruebas con `a563ae1`: son idénticos a la versión que pasó
+76 comprobaciones y los escenarios Android/web. Ver `README_HU05_HU10.md`.
 Crea y elimina una base efímera; requiere permisos MySQL para crear bases de prueba.
 El spec no debe ejecutarse directamente contra una base real.
 

@@ -4,12 +4,14 @@ Fecha: 28 de octubre de 2026. Rama: `feature/HU10-pases-acceso-qr`, integración
 
 ## Estado actual
 
-Paso 2 completado: HU05 se integra dentro de HU10, sobre la base de `origin/main`.
-Las pruebas de esta integración quedan pendientes para el paso 3; no se ejecutan
-en este paso. `main` local y `origin/main` permanecen en `c276308`.
-No se ha publicado esta integración ni se ha llevado HU10 a main.
-Los resultados siguientes corresponden a la verificación anterior en la rama
-local `codex`, conservada como referencia.
+HU10 integra main + HU05 + HU10 mediante el merge `bce77fc`.
+Se comprobó que todo el código y las pruebas son idénticos a la referencia
+local `a563ae1`, que pasó 76 comprobaciones, 4 tests Android en Samsung y
+4 escenarios web. Las únicas diferencias son estos documentos de estado.
+La verificación se realiza por comparación completa de Git; no se repiten
+pruebas sobre código idéntico. El usuario autorizó publicar esta integración
+únicamente en HU10. `main` local y remoto permanecen en `c276308`;
+la integración de HU10 a main sigue pendiente y codex permanece solo local.
 
 ## Resultados previos de referencia
 
@@ -20,7 +22,7 @@ local `codex`, conservada como referencia.
 - `npm run lint`, `npm run build` y sintaxis PHP correctos.
 - Regresiones verificadas por HTTP: login de administrador, inmuebles, autenticación Bearer existente, sesión móvil, adeudos, historial de pagos y contratos. Se conservan sus servicios.
 - Las pruebas crearon y eliminaron bases `alkira_pruebas_*` y copias temporales del backend. No importaron SQL ni cambiaron usuarios o registros en la base de trabajo.
-- Base remota consultada: `origin/main` en `c276308`. La integración actual está en HU10; main permanece sin cambios y no se hizo push.
+- Base remota consultada: `origin/main` en `c276308`. La integración actual está en HU10; la publicación se limita a esa rama y main permanece sin cambios.
 
 ## Implementado
 
