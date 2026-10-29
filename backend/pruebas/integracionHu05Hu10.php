@@ -302,11 +302,13 @@ try {
             $ejecutar([$adb, '-s', $serial, 'install', '-r', '-t', $raiz . '/movil/app/build/outputs/apk/debug/app-debug.apk'], 'Instalar app de pruebas separada');
             $ejecutar([$adb, '-s', $serial, 'install', '-r', '-t', $raiz . '/movil/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk'], 'Instalar instrumentacion');
             $ejecutar([$adb, '-s', $serial, 'reverse', 'tcp:8000', 'tcp:' . $puerto], 'Restablecer conexion USB despues de instalar');
-            $resultado = $ejecutar([$adb, '-s', $serial, 'shell', 'am', 'instrument', '-w', '-r', '-e', 'alkiraPrueba', 'true', '-e', 'alkiraClave', $password,
+            $seleccionAndroid = in_array('--android-integral', $argv, true)
+                ? ['-e', 'class', 'com.alkira.movil.HistoriasNavegacionTest'] : [];
+            $resultado = $ejecutar([$adb, '-s', $serial, 'shell', 'am', 'instrument', '-w', '-r', ...$seleccionAndroid, '-e', 'alkiraPrueba', 'true', '-e', 'alkiraClave', $password,
                 'com.alkira.movil.pruebas.test/androidx.test.runner.AndroidJUnitRunner'], 'Ejecutar pruebas en Android');
             if (preg_match('/OK \((\d+) tests?\)/', $resultado, $resumen)) echo 'Android: ' . $resumen[1] . " pruebas correctas.\n";
             else {
-                foreach (explode("\n", $resultado) as $linea) if (preg_match('/Exception:|Error:|Caused by:|failed to connect|FAILURES|Tests run:|AssertionError/', $linea)) echo $linea . "\n";
+                foreach (explode("\n", $resultado) as $linea) if (preg_match('/Exception:|Error:|Caused by:|failed to connect|FAILURES|Tests run:|AssertionError|HistoriasNavegacionTest.kt/', $linea)) echo $linea . "\n";
             }
             comprobar(str_contains($resultado, 'OK (') && !str_contains($resultado, 'FAILURES!!!') && !str_contains($resultado, 'INSTRUMENTATION_FAILED'), 'Android fisico: interfaz y API real');
             if ($hu10) {
@@ -337,6 +339,9 @@ try {
     echo "RESULTADO: $ok comprobaciones correctas.\n";
 } catch (Throwable $error) {
     fwrite(STDERR, 'FALLO: ' . $error->getMessage() . "\n");
+    if (in_array('--android-integral', $argv, true) && is_file($temporal . '/servidor.log')) {
+        echo implode('', array_slice(file($temporal . '/servidor.log'), -18));
+    }
     $salida = 1;
 } finally {
     if (is_resource($servidor)) { proc_terminate($servidor); proc_close($servidor); }
