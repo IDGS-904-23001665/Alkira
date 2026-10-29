@@ -10,6 +10,7 @@ require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
 require_once dirname(__DIR__) . '/controllers/InmueblesControlador.php';
 require_once dirname(__DIR__) . '/controllers/AdeudosControlador.php';
 require_once dirname(__DIR__) . '/controllers/HistorialContratosControlador.php';
+require_once dirname(__DIR__) . '/controllers/IncidenciasControlador.php';
 require_once dirname(__DIR__) . '/controllers/AccesosQrControlador.php';
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
@@ -21,6 +22,8 @@ $rutaHu01 = is_string($ruta) && (
     || preg_match('#^/api/asignaciones/[1-9][0-9]*/finalizar$#D', $ruta) === 1
     || $ruta === '/api/usuarios/buscar'
 );
+
+$rutaResidentesQr = $ruta === '/api/incidencias/residentes' && $metodo === 'GET';
 
 $rutaHu10 = is_string($ruta) && (
     $ruta === '/api/accesos-qr'
@@ -51,7 +54,7 @@ try {
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
 
-    if (!$rutaHu01 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true)) {
+    if (!$rutaHu01 && !$rutaResidentesQr && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -91,6 +94,21 @@ try {
             new InmueblesServicio(new InmueblesRepositorio($conexion))
         );
         $controladorInmuebles->procesar($metodo, $ruta);
+        exit;
+    }
+
+    if ($rutaResidentesQr) {
+        $usuario = $servicio->verificarToken($_COOKIE['alkira_token'] ?? null);
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);
+            exit;
+        }
+        $controladorIncidencias = new IncidenciasControlador(
+            new IncidenciasServicio(new IncidenciasRepositorio($conexion)),
+            $usuario
+        );
+        $controladorIncidencias->procesar($metodo, $ruta);
         exit;
     }
 
