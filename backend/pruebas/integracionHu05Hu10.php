@@ -59,6 +59,8 @@ function solicitar(string $metodo, string $ruta, mixed $datos = null, ?string $c
     global $base;
     $c = curl_init($base . $ruta);
     $headers = [];
+    $conArchivo = is_array($datos) && (bool) array_filter($datos, fn($dato) => $dato instanceof CURLFile);
+    if ($conArchivo) $headers[] = 'Expect:';
     if ($datos !== null && !is_array($datos)) {
         $headers[] = 'Content-Type: application/json';
     } elseif (is_array($datos) && !array_filter($datos, fn($dato) => $dato instanceof CURLFile)) {
@@ -68,7 +70,7 @@ function solicitar(string $metodo, string $ruta, mixed $datos = null, ?string $c
     if ($cookie !== null) $headers[] = 'Cookie: alkira_token=' . $cookie;
     if ($bearer !== null) $headers[] = 'Authorization: Bearer ' . $bearer;
     curl_setopt_array($c, [CURLOPT_CUSTOMREQUEST => $metodo, CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HEADER => true, CURLOPT_HTTPHEADER => $headers, CURLOPT_TIMEOUT => 15]);
+        CURLOPT_HEADER => true, CURLOPT_HTTPHEADER => $headers, CURLOPT_TIMEOUT => $conArchivo ? 60 : 15]);
     if ($datos !== null) curl_setopt($c, CURLOPT_POSTFIELDS, $datos);
     $resultado = curl_exec($c);
     if ($resultado === false) throw new RuntimeException(curl_error($c));

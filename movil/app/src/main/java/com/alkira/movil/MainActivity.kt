@@ -292,7 +292,7 @@ private fun AplicacionAutenticada(
                     "PAGOS" -> EstadoCuentaScreen()
                     "SUBIR_PAGO" -> HU03_Screen()
                     "VALIDAR_PAGOS" -> HU04_Screen()
-                    "REPORTAR_FALLA" -> HU05_Screen()
+                    "REPORTAR_FALLA" -> IncidenciasScreen()
                     "PROPIEDADES" -> HU01_Screen()
                     "MANTENIMIENTO" -> TicketsScreen(onNavigateBack = { currentScreen = "INICIO" })
                     "COMUNIDAD" -> VotacionesScreen(onNavigateBack = { currentScreen = "INICIO" })

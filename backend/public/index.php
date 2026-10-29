@@ -10,9 +10,11 @@ require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
 require_once dirname(__DIR__) . '/controllers/InmueblesControlador.php';
 require_once dirname(__DIR__) . '/controllers/AdeudosControlador.php';
 require_once dirname(__DIR__) . '/controllers/HistorialContratosControlador.php';
+require_once dirname(__DIR__) . '/controllers/IncidenciasControlador.php';
 require_once dirname(__DIR__) . '/controllers/ResidentesControlador.php';
 require_once dirname(__DIR__) . '/services/AutenticacionSolicitud.php';
 require_once dirname(__DIR__) . '/controllers/AccesosQrControlador.php';
+require_once dirname(__DIR__) . '/services/AutenticacionSolicitud.php';
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -25,6 +27,12 @@ $rutaHu01 = is_string($ruta) && (
 );
 
 $rutaResidentes = $ruta === '/api/incidencias/residentes';
+
+$rutaHu05 = is_string($ruta) && (
+    $ruta === '/api/incidencias'
+    || $ruta === '/api/incidencias/unidades'
+    || preg_match('#^/api/incidencias/[1-9][0-9]*(?:/evidencias(?:/[1-9][0-9]*/archivo)?|/estado)?$#D', $ruta) === 1
+);
 
 $rutaHu10 = is_string($ruta) && (
     $ruta === '/api/accesos-qr'
@@ -55,7 +63,7 @@ try {
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
 
-    if (!$rutaHu01 && !$rutaResidentes && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true)) {
+    if (!$rutaHu01 && !$rutaResidentes && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -111,6 +119,21 @@ try {
             exit;
         }
         (new ResidentesControlador(new ResidentesServicio(new ResidentesRepositorio($conexion))))->procesar($metodo);
+        exit;
+    }
+
+    if ($rutaHu05) {
+        $usuario = AutenticacionSolicitud::usuario($servicio);
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);
+            exit;
+        }
+        $controladorIncidencias = new IncidenciasControlador(
+            new IncidenciasServicio(new IncidenciasRepositorio($conexion)),
+            $usuario
+        );
+        $controladorIncidencias->procesar($metodo, $ruta);
         exit;
     }
 
