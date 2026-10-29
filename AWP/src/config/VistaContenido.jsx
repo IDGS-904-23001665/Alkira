@@ -7,9 +7,9 @@ const PANTALLAS = {
   seguridad: SeguridadQr,
 }
 
-function VistaContenido({ seccion }) {
+function VistaContenido({ seccion, usuario }) {
   const Componente = PANTALLAS[seccion.id] ?? PaginaPendiente
-  return <Componente seccion={seccion} />
+  return <Componente seccion={seccion} usuario={usuario} />
 }
 
 export default VistaContenido

@@ -31,8 +31,8 @@ final class AccesosQrServicio
             ? (int) $entrada['idUsuarioAnfitrion']
             : $idUsuarioSesion;
 
-        if ($idAnfitrion < 1) {
-            throw new InvalidArgumentException('El anfitrión es obligatorio.');
+        if ($idAnfitrion < 1 || !$this->repositorio->anfitrionActivo($idAnfitrion)) {
+            throw new InvalidArgumentException('El anfitrión debe ser un inquilino o propietario activo.');
         }
 
         $nombreVisitante = trim((string) ($entrada['nombreVisitante'] ?? ''));
@@ -40,21 +40,27 @@ final class AccesosQrServicio
             throw new InvalidArgumentException('El nombre del visitante es obligatorio (máx. 150 caracteres).');
         }
 
-        $ahora = new DateTimeImmutable('now');
+        $ahora = new DateTimeImmutable($this->repositorio->fechaActual());
         $fechaInicio = !empty($entrada['fechaInicioVigencia'])
             ? $this->normalizarFechaHora((string) $entrada['fechaInicioVigencia'])
             : $ahora->format('Y-m-d H:i:s');
 
-        $horasVigencia = isset($entrada['horasVigencia']) && is_numeric($entrada['horasVigencia'])
-            ? max(1, min(168, (int) $entrada['horasVigencia']))
-            : 6;
+        $horasVigencia = filter_var($entrada['horasVigencia'] ?? 6, FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 168]]);
+        if ($horasVigencia === false) {
+            throw new InvalidArgumentException('La vigencia debe ser un número entero de 1 a 168 horas.');
+        }
 
         $fechaFin = !empty($entrada['fechaFinVigencia'])
             ? $this->normalizarFechaHora((string) $entrada['fechaFinVigencia'])
             : (new DateTimeImmutable($fechaInicio))->modify("+{$horasVigencia} hours")->format('Y-m-d H:i:s');
 
-        if ($fechaFin <= $fechaInicio) {
-            throw new InvalidArgumentException('La fecha de fin de vigencia debe ser posterior al inicio.');
+        if ($fechaFin <= $fechaInicio || $fechaFin <= $ahora->format('Y-m-d H:i:s')) {
+            throw new InvalidArgumentException('La vigencia debe terminar después del inicio y de la fecha actual.');
+        }
+
+        if ((new DateTimeImmutable($fechaFin))->getTimestamp() - (new DateTimeImmutable($fechaInicio))->getTimestamp() > 168 * 3600) {
+            throw new InvalidArgumentException('La vigencia máxima es de 168 horas.');
         }
 
         $pase = $this->repositorio->generarPase([
@@ -94,6 +100,9 @@ final class AccesosQrServicio
             ? trim((string) $entrada['observaciones'])
             : null;
 
+        if ($observaciones !== null && mb_strlen($observaciones) > 500) {
+            throw new InvalidArgumentException('Las observaciones admiten como máximo 500 caracteres.');
+        }
         $resultado = $this->repositorio->validarToken($tokenQr, $idGuardiaSesion, $observaciones);
         if (!$resultado) {
             throw new RuntimeException('No se obtuvo respuesta al validar el código QR.');
@@ -109,7 +118,7 @@ final class AccesosQrServicio
             $limpio .= ':00';
         }
         $dt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $limpio);
-        if (!$dt) {
+        if (!$dt || $dt->format('Y-m-d H:i:s') !== $limpio) {
             throw new InvalidArgumentException('Formato de fecha y hora inválido (use YYYY-MM-DD HH:MM).');
         }
         return $dt->format('Y-m-d H:i:s');

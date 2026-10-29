@@ -61,7 +61,7 @@ function MenuLateral({ seccionActiva, onCambiarSeccion, onSalir, usuario }) {
 
         <div className="alkira-menu-seccion">ESPACIO DE TRABAJO</div>
         <nav className="alkira-menu-opciones" aria-label="Navegación principal">
-          {SECCIONES.map(({ id, texto, icono }) => (
+          {SECCIONES.filter(({ id }) => usuario.tipoUsuario !== 'guardia' || id === 'seguridad').map(({ id, texto, icono }) => (
             <button
               key={id}
               type="button"

@@ -10,7 +10,7 @@ require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
 require_once dirname(__DIR__) . '/controllers/InmueblesControlador.php';
 require_once dirname(__DIR__) . '/controllers/AdeudosControlador.php';
 require_once dirname(__DIR__) . '/controllers/HistorialContratosControlador.php';
-require_once dirname(__DIR__) . '/controllers/IncidenciasControlador.php';
+require_once dirname(__DIR__) . '/controllers/ResidentesControlador.php';
 require_once dirname(__DIR__) . '/controllers/AccesosQrControlador.php';
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
@@ -23,7 +23,7 @@ $rutaHu01 = is_string($ruta) && (
     || $ruta === '/api/usuarios/buscar'
 );
 
-$rutaResidentesQr = $ruta === '/api/incidencias/residentes' && $metodo === 'GET';
+$rutaResidentes = $ruta === '/api/incidencias/residentes';
 
 $rutaHu10 = is_string($ruta) && (
     $ruta === '/api/accesos-qr'
@@ -54,7 +54,7 @@ try {
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
 
-    if (!$rutaHu01 && !$rutaResidentesQr && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true)) {
+    if (!$rutaHu01 && !$rutaResidentes && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -79,7 +79,7 @@ try {
     $controlador = new AutenticacionControlador($servicio);
 
     if ($rutaHu01) {
-        $usuario = $servicio->verificarToken($_COOKIE['alkira_token'] ?? null);
+        $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
         if ($usuario === null) {
             http_response_code(401);
             echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);
@@ -97,23 +97,24 @@ try {
         exit;
     }
 
-    if ($rutaResidentesQr) {
-        $usuario = $servicio->verificarToken($_COOKIE['alkira_token'] ?? null);
+    if ($rutaResidentes) {
+        $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
         if ($usuario === null) {
             http_response_code(401);
-            echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);
+            echo json_encode(['mensaje' => 'Sesion no valida o vencida.']);
             exit;
         }
-        $controladorIncidencias = new IncidenciasControlador(
-            new IncidenciasServicio(new IncidenciasRepositorio($conexion)),
-            $usuario
-        );
-        $controladorIncidencias->procesar($metodo, $ruta);
+        if ($usuario['tipoUsuario'] !== 'administrador') {
+            http_response_code(403);
+            echo json_encode(['mensaje' => 'Solo administracion puede consultar residentes.']);
+            exit;
+        }
+        (new ResidentesControlador(new ResidentesServicio(new ResidentesRepositorio($conexion))))->procesar($metodo);
         exit;
     }
 
     if ($rutaHu10) {
-        $usuario = $servicio->verificarToken($_COOKIE['alkira_token'] ?? null);
+        $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
         if ($usuario === null) {
             http_response_code(401);
             echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);

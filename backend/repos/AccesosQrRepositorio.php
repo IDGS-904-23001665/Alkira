@@ -7,12 +7,6 @@ final class AccesosQrRepositorio
 
     public function listarTodosPases(): array
     {
-        $this->conexion->exec(
-            "UPDATE pases_acceso_qr
-             SET estado = 'vencido'
-             WHERE estado = 'vigente' AND NOW() > fecha_fin_vigencia"
-        );
-
         return $this->conexion->query(
             "SELECT
                 id_pase AS idPase,
@@ -24,7 +18,7 @@ final class AccesosQrRepositorio
                 token_qr AS tokenQr,
                 fecha_inicio_vigencia AS fechaInicioVigencia,
                 fecha_fin_vigencia AS fechaFinVigencia,
-                estado,
+                CASE WHEN estado = 'vigente' AND NOW() > fecha_fin_vigencia THEN 'vencido' ELSE estado END AS estado,
                 fecha_creacion AS fechaCreacion
             FROM view_pases_acceso_qr
             ORDER BY fecha_creacion DESC, id_pase DESC"
@@ -64,6 +58,23 @@ final class AccesosQrRepositorio
 
     public function generarPase(array $datos): array|false
     {
+        return $this->transaccion(fn() => $this->generarRegistro($datos));
+    }
+
+    public function fechaActual(): string
+    {
+        return (string) $this->conexion->query('SELECT NOW()')->fetchColumn();
+    }
+
+    public function anfitrionActivo(int $idUsuario): bool
+    {
+        $consulta = $this->conexion->prepare("SELECT 1 FROM usuarios WHERE id_usuario = ? AND activo = 1 AND estado = 'activo' AND tipo_usuario IN ('inquilino', 'propietario')");
+        $consulta->execute([$idUsuario]);
+        return (bool) $consulta->fetchColumn();
+    }
+
+    private function generarRegistro(array $datos): array|false
+    {
         $consulta = $this->conexion->prepare(
             'CALL sp_generar_pase_qr(:idAnfitrion, :nombreVisitante, :fechaInicio, :fechaFin)'
         );
@@ -75,10 +86,33 @@ final class AccesosQrRepositorio
         ]);
         $pase = $consulta->fetch(PDO::FETCH_ASSOC);
         $consulta->closeCursor();
+        if ($pase) {
+            $token = 'ALK-QR-' . bin2hex(random_bytes(24));
+            $consulta = $this->conexion->prepare('UPDATE pases_acceso_qr SET token_qr = ? WHERE id_pase = ?');
+            $consulta->execute([$token, $pase['idPase']]);
+            $consulta = $this->conexion->prepare("UPDATE historial_actividades_kdd SET datos_contexto = JSON_SET(datos_contexto, '$.tokenQr', ?) WHERE tipo_actividad = 'pase_qr_generado' AND JSON_UNQUOTE(JSON_EXTRACT(datos_contexto, '$.idPase')) = ?");
+            $consulta->execute([$token, (string) $pase['idPase']]);
+            $pase['tokenQr'] = $token;
+        }
         return $pase;
     }
 
     public function revocarPase(int $idPase, int $idUsuario): array|false
+    {
+        return $this->transaccion(function () use ($idPase, $idUsuario) {
+            $consulta = $this->conexion->prepare("SELECT CASE WHEN estado = 'vigente' AND NOW() > fecha_fin_vigencia THEN 'vencido' ELSE estado END FROM pases_acceso_qr WHERE id_pase = ? FOR UPDATE");
+            $consulta->execute([$idPase]);
+            $estado = $consulta->fetchColumn();
+            if ($estado === false) return false;
+            if ($estado !== 'vigente') throw new DomainException('Solo se puede revocar un pase vigente.');
+            $consulta = $this->conexion->prepare('SELECT id_visita FROM bitacora_visitas WHERE id_pase = ? AND fecha_entrada IS NOT NULL AND fecha_salida IS NULL');
+            $consulta->execute([$idPase]);
+            if ($consulta->fetchColumn()) throw new DomainException('Registra la salida antes de revocar una visita en el interior.');
+            return $this->revocarRegistro($idPase, $idUsuario);
+        });
+    }
+
+    private function revocarRegistro(int $idPase, int $idUsuario): array|false
     {
         $consulta = $this->conexion->prepare('CALL sp_revocar_pase_qr(:idPase, :idUsuario)');
         $consulta->execute([
@@ -92,6 +126,18 @@ final class AccesosQrRepositorio
 
     public function validarToken(string $tokenQr, int $idGuardia, ?string $observaciones): array|false
     {
+        return $this->transaccion(function () use ($tokenQr, $idGuardia, $observaciones) {
+            // Serializa validación y revocación del mismo pase hasta completar el procedimiento.
+            $bloqueo = $this->conexion->prepare('SELECT id_pase FROM pases_acceso_qr WHERE token_qr = ? FOR UPDATE');
+            $bloqueo->execute([$tokenQr]);
+            $bloqueo->fetchColumn();
+            $bloqueo->closeCursor();
+            return $this->validarRegistro($tokenQr, $idGuardia, $observaciones);
+        });
+    }
+
+    private function validarRegistro(string $tokenQr, int $idGuardia, ?string $observaciones): array|false
+    {
         $consulta = $this->conexion->prepare(
             'CALL sp_validar_qr(:tokenQr, :idGuardia, :observaciones)'
         );
@@ -103,5 +149,18 @@ final class AccesosQrRepositorio
         $resultado = $consulta->fetch(PDO::FETCH_ASSOC);
         $consulta->closeCursor();
         return $resultado;
+    }
+    private function transaccion(callable $accion): mixed
+    {
+        $propia = !$this->conexion->inTransaction();
+        if ($propia) $this->conexion->beginTransaction();
+        try {
+            $resultado = $accion();
+            if ($propia) $this->conexion->commit();
+            return $resultado;
+        } catch (Throwable $error) {
+            if ($propia && $this->conexion->inTransaction()) $this->conexion->rollBack();
+            throw $error;
+        }
     }
 }

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiAccesosQr as api } from "../../services/accesosQr.js";
-import { apiIncidencias } from "../../services/incidencias.js";
+import { listarResidentes } from "../../services/residentes.js";
 import "../modulo1/Propiedades.css";
 import "./SeguridadQr.css";
+import LectorQr from "./LectorQr.jsx";
+import ImagenQr from "./ImagenQr.jsx";
 
 const ETIQUETAS_ESTADO_PASE = {
   vigente: "Vigente",
@@ -83,7 +85,9 @@ function Modal({ titulo, descripcion, onCerrar, children }) {
   );
 }
 
-export default function SeguridadQr() {
+export default function SeguridadQr({ usuario }) {
+  const esAdmin = usuario?.tipoUsuario === "administrador";
+  const [paseVisualizado, setPaseVisualizado] = useState(null);
   const [pestana, setPestana] = useState("caseta");
   const [pases, setPases] = useState([]);
   const [bitacora, setBitacora] = useState([]);
@@ -121,7 +125,7 @@ export default function SeguridadQr() {
       ] = await Promise.all([
         api.listarPases(),
         api.bitacora(),
-        apiIncidencias.residentes(),
+        esAdmin ? listarResidentes() : Promise.resolve({ residentes: [] }),
       ]);
       setPases(listaPases);
       setBitacora(listaBitacora);
@@ -131,7 +135,7 @@ export default function SeguridadQr() {
     } finally {
       if (!silencioso) setCargando(false);
     }
-  }, []);
+  }, [esAdmin]);
 
   useEffect(() => {
     cargarDatos(false);
@@ -184,7 +188,7 @@ export default function SeguridadQr() {
         !q ||
         item.nombreVisitante.toLowerCase().includes(q) ||
         item.nombreAnfitrion.toLowerCase().includes(q) ||
-        item.numeroUnidad.toLowerCase().includes(q) ||
+        (item.numeroUnidad || "").toLowerCase().includes(q) ||
         item.tokenQr.toLowerCase().includes(q);
       const coincideEstado =
         !filtroEstadoPase || item.estado === filtroEstadoPase;
@@ -250,6 +254,7 @@ export default function SeguridadQr() {
       await cargarDatos(true);
       setModalGenerar(false);
       setTokenInput(pase.tokenQr);
+      setPaseVisualizado(pase);
       setMensaje(
         `Pase QR generado para ${pase.nombreVisitante} (${pase.tokenQr}).`,
       );
@@ -365,12 +370,14 @@ export default function SeguridadQr() {
               <button
                 type="button"
                 className="hu01-boton-secundario"
+                hidden={!esAdmin}
                 onClick={abrirModalGenerar}
               >
                 Emitir pase QR
               </button>
             }
           >
+            <LectorQr onLeer={(token) => { setTokenInput(token); setMensaje("QR leído. Confirma la validación para registrar el movimiento."); }} />
             <form onSubmit={validarQrEnCaseta}>
               <div className="hu01-form-grid">
                 <Campo etiqueta="Token o código QR del visitante">
@@ -640,7 +647,8 @@ export default function SeguridadQr() {
             <button
               type="button"
               className="hu01-boton-primario"
-              onClick={abrirModalGenerar}
+              hidden={!esAdmin}
+                onClick={abrirModalGenerar}
             >
               Generar pase QR
             </button>
@@ -721,7 +729,8 @@ export default function SeguridadQr() {
                         >
                           Probar en caseta
                         </button>
-                        {p.estado === "vigente" && (
+                        <button type="button" className="hu01-enlace" onClick={() => setPaseVisualizado(p)}>Ver QR</button>
+                        {esAdmin && p.estado === "vigente" && (
                           <button
                             type="button"
                             className="hu01-enlace hu01-peligro"
@@ -740,7 +749,12 @@ export default function SeguridadQr() {
         </Panel>
       )}
 
-      {modalGenerar && (
+      {paseVisualizado && <Modal titulo={`Pase de ${paseVisualizado.nombreVisitante}`}
+        descripcion={`Vigente hasta ${paseVisualizado.fechaFinVigencia}`} onCerrar={() => setPaseVisualizado(null)}>
+        <ImagenQr token={paseVisualizado.tokenQr} />
+        <p className="hu10-token-mono" style={{ overflowWrap: 'anywhere' }}>{paseVisualizado.tokenQr}</p>
+      </Modal>}
+      {modalGenerar && esAdmin && (
         <Modal
           titulo="Generar pase de acceso QR temporal"
           descripcion="Crea un token único en la base de datos con vigencia controlada para un visitante."
@@ -761,7 +775,7 @@ export default function SeguridadQr() {
                   required
                 >
                   {residentes.map((r) => (
-                    <option key={r.idUsuario} value={r.idUsuario}>
+                    <option key={`${r.idUsuario}-${r.idUnidad || "sin-unidad"}`} value={r.idUsuario}>
                       {r.nombreCompleto}{" "}
                       {r.numeroUnidad ? `(${r.numeroUnidad})` : ""}
                     </option>

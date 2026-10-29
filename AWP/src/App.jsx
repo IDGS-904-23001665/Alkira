@@ -64,7 +64,9 @@ function App() {
     )
   }
 
-  const seccion = SECCIONES.find(({ id }) => id === seccionActiva) ?? SECCIONES[0]
+  const seccionesPermitidas = usuario.tipoUsuario === 'guardia'
+    ? SECCIONES.filter(({ id }) => id === 'seguridad') : SECCIONES
+  const seccion = seccionesPermitidas.find(({ id }) => id === seccionActiva) ?? seccionesPermitidas[0]
 
   return (
     <div className="alkira-aplicacion">
@@ -81,7 +83,7 @@ function App() {
           usuario={usuario}
         />
         <main className="alkira-contenido">
-          <VistaContenido seccion={seccion} />
+          <VistaContenido seccion={seccion} usuario={usuario} />
         </main>
       </div>
     </div>

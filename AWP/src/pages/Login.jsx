@@ -56,7 +56,7 @@ function Login({ onIniciarSesion, errorConexion = '' }) {
           <section className="col-lg-6 alkira-login-formulario-seccion">
             <div className="alkira-login-tarjeta">
               <h2>Iniciar sesión</h2>
-              <p className="alkira-login-instruccion">Accede al panel de administración.</p>
+              <p className="alkira-login-instruccion">Accede a administración o caseta según tu perfil.</p>
 
               <form onSubmit={ingresar} noValidate>
                 <div className="mb-3">

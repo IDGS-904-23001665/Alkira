@@ -13,7 +13,21 @@ final class AccesosQrControlador
     public function procesar(string $metodo, string $ruta): void
     {
         try {
-            $idSesion = (int) ($this->usuarioSesion['idUsuario'] ?? 1);
+            $idSesion = (int) ($this->usuarioSesion['idUsuario'] ?? 0);
+
+            if ($idSesion < 1) {
+                $this->responder(401, ['mensaje' => 'Sesión no válida.']);
+                return;
+            }
+            $esAdmin = ($this->usuarioSesion['tipoUsuario'] ?? '') === 'administrador';
+            $esGuardia = ($this->usuarioSesion['tipoUsuario'] ?? '') === 'guardia';
+            if ((!$esAdmin && !$esGuardia) || (!$esAdmin && !(
+                ($metodo === 'GET' && in_array($ruta, ['/api/accesos-qr', '/api/accesos-qr/bitacora'], true))
+                || ($metodo === 'POST' && $ruta === '/api/accesos-qr/validar')
+            ))) {
+                $this->responder(403, ['mensaje' => 'No tienes permisos para esta operación.']);
+                return;
+            }
 
             if ($metodo === 'GET' && $ruta === '/api/accesos-qr') {
                 if (isset($_GET['idUsuario']) && is_numeric($_GET['idUsuario'])) {

@@ -26,6 +26,16 @@ final class AutenticacionServicio
         return $this->validarAcceso($correo, $contrasena, self::TIPOS_MOVILES);
     }
 
+    public function ingresarWeb(string $correo, string $contrasena): ?array
+    {
+        return $this->validarAcceso($correo, $contrasena, ['administrador', 'guardia']);
+    }
+
+    public function verificarTokenWeb(?string $token): ?array
+    {
+        return $this->verificarAcceso($token, ['administrador', 'guardia']);
+    }
+
     private function validarAcceso(string $correo, string $contrasena, array $tiposPermitidos): ?array
     {
         $usuario = $this->repositorio->buscarPorCorreo(strtolower(trim($correo)));
