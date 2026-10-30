@@ -8,6 +8,7 @@ header('X-Content-Type-Options: nosniff');
 require_once dirname(__DIR__) . '/config/Conexion.php';
 require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
 require_once dirname(__DIR__) . '/repos/ComprobantesRepositorio.php';
+require_once dirname(__DIR__) . '/controllers/ComprobantesMovilControlador.php';
 require_once dirname(__DIR__) . '/controllers/InmueblesControlador.php';
 require_once dirname(__DIR__) . '/controllers/AdeudosControlador.php';
 require_once dirname(__DIR__) . '/controllers/HistorialContratosControlador.php';
@@ -56,6 +57,8 @@ try {
         ['GET',  '/api/comprobantes'],
         ['GET',  '/api/comprobantes/archivo'],
         ['POST', '/api/comprobantes/preregistrar'],
+        ['GET', '/api/comprobantes/adeudos-movil'],
+        ['POST', '/api/comprobantes/enviar-movil'],
     ];
 
     $rutaAdeudos = $ruta === '/api/adeudos/pendientes' && $metodo === 'GET';
@@ -173,6 +176,33 @@ try {
             )
         );
         $controladorHistorial->procesar($ruta);
+        exit;
+    }
+
+    // HU03.1: endpoints móviles. La identidad proviene del JWT Bearer.
+    if (($ruta === '/api/comprobantes/adeudos-movil' && $metodo === 'GET') ||
+        ($ruta === '/api/comprobantes/enviar-movil' && $metodo === 'POST')) {
+        $headerAutorizacion = $_SERVER['HTTP_AUTHORIZATION']
+            ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+        $token = null;
+        if (is_string($headerAutorizacion) &&
+            preg_match('/^Bearer ([A-Za-z0-9_.-]+)$/i', trim($headerAutorizacion), $coincidencias) === 1) {
+            $token = $coincidencias[1];
+        }
+        $usuario = $servicio->verificarTokenMovil($token);
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesión móvil inválida o vencida.']);
+            exit;
+        }
+        $controladorMovil = new ComprobantesMovilControlador(
+            new ComprobantesMovilRepositorio($conexion)
+        );
+        if ($metodo === 'GET') {
+            $controladorMovil->obtenerAdeudos($usuario);
+        } else {
+            $controladorMovil->enviar($usuario);
+        }
         exit;
     }
 
