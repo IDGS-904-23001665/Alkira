@@ -55,13 +55,8 @@ function Login({ onIniciarSesion, errorConexion = '' }) {
 
           <section className="col-lg-6 alkira-login-formulario-seccion">
             <div className="alkira-login-tarjeta">
-              <div className="alkira-login-espacio-logo" aria-label="Espacio reservado para el logotipo">
-                <div className="alkira-login-logo-marcador"></div>
-                <small></small>
-              </div>
-
               <h2>Iniciar sesión</h2>
-              <p className="alkira-login-instruccion">Accede al panel de administración.</p>
+              <p className="alkira-login-instruccion">Accede a administración o caseta según tu perfil.</p>
 
               <form onSubmit={ingresar} noValidate>
                 <div className="mb-3">

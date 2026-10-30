@@ -1,0 +1,18 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * ALKIRA - HU03.2
+ *
+ * Archivo de ejemplo para configurar
+ * la carpeta privada de comprobantes.
+ *
+ * Copiar como comprobantes.local.php
+ * y cambiar la ruta según la computadora.
+ *
+ * No almacenar comprobantes dentro de public.
+ */
+
+return [
+    'directorioPrivado' => 'C:/ruta/privada/alkira/comprobantes',
+];
