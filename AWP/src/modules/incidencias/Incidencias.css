@@ -1,0 +1,53 @@
+/* Complementos específicos de Módulo 05 (Incidencias) sobre la base estándar de Propiedades.css (.hu01) */
+
+.hu01-estado.reportada,
+.hu01-estado.media {
+  background: #fff3da;
+  color: #c08919;
+}
+
+.hu01-estado.en_revision,
+.hu01-estado.en_proceso {
+  background: #e6f2ff;
+  color: #2563eb;
+}
+
+.hu01-estado.asignada,
+.hu01-estado.resuelta,
+.hu01-estado.cerrada,
+.hu01-estado.baja {
+  background: #e4f8ee;
+  color: #07975d;
+}
+
+.hu01-estado.alta {
+  background: #ffe8e8;
+  color: #c53030;
+}
+
+.hu05-evidencias-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.hu05-evidencia-card {
+  background: #f7f9fe;
+  border: 1px solid #e3eaf5;
+  border-radius: 9px;
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.hu05-evidencia-card strong {
+  color: #1c3155;
+  font-size: 12px;
+}
+
+.hu05-evidencia-card small {
+  color: #7c8ba5;
+  font-size: 11px;
+  word-break: break-all;
+}

@@ -6,26 +6,34 @@
   --alkira-menu: #0b142e;
 }
 
-.alkira-aplicacion { display: flex; min-height: 100vh; background: var(--alkira-fondo); }
-.alkira-menu-lateral { position: sticky; top: 0; display: flex; flex-direction: column; width: 238px; min-width: 238px; height: 100vh; background: var(--alkira-menu); color: #d6e1fa; padding: 24px 10px 12px; z-index: 30; }
-.alkira-marca { display: flex; gap: 12px; align-items: center; padding: 0 14px 32px; color: white; }
+.alkira-aplicacion { position: fixed; inset: 0; display: flex; width: 100%; height: 100dvh; overflow: hidden; overscroll-behavior: none; background: var(--alkira-fondo); }
+.alkira-menu-lateral { display: flex; flex-direction: column; width: 238px; min-width: 238px; height: 100%; overflow-y: auto; overflow-x: hidden; overscroll-behavior: none; background: var(--alkira-menu); color: #d6e1fa; padding: 24px 10px 12px; z-index: 30; }
+.alkira-menu-lateral::-webkit-scrollbar { width: 4px; }
+.alkira-menu-lateral::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.alkira-menu-lateral::-webkit-scrollbar-track { background: transparent; }
+.alkira-menu-lateral::-webkit-scrollbar-thumb { background: rgba(148,163,184,.28); border-radius: 999px; }
+.alkira-menu-lateral::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.48); }
+.alkira-marca { display: flex; gap: 12px; align-items: center; padding: 0 14px 24px; color: white; flex-shrink: 0; }
 .alkira-marca strong, .alkira-marca small { display: block; }
 .alkira-marca strong { font-size: 15px; letter-spacing: .03em; }
 .alkira-marca small { color: #8e9dbe; font-size: 10px; }
 .alkira-marca-icono { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; background: #2563eb; }
-.alkira-menu-seccion { padding: 4px 15px 16px; color: #7484a6; font-size: 10px; font-weight: 700; letter-spacing: .13em; }
-.alkira-menu-opciones { display: grid; gap: 4px; }
-.alkira-opcion { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 0; border-radius: 7px; color: #acb9d2; background: transparent; font-size: 13px; text-align: left; cursor: pointer; }
+.alkira-menu-seccion { padding: 4px 15px 12px; color: #7484a6; font-size: 10px; font-weight: 700; letter-spacing: .13em; flex-shrink: 0; }
+.alkira-menu-opciones { display: grid; gap: 4px; flex-shrink: 0; }
+.alkira-opcion { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 14px; border: 0; border-radius: 7px; color: #acb9d2; background: transparent; font-size: 13px; text-align: left; cursor: pointer; }
 .alkira-opcion:hover { color: #fff; background: #172344; }
 .alkira-opcion-activa, .alkira-opcion-activa:hover { color: #fff; background: var(--alkira-azul); font-weight: 600; }
-.alkira-menu-pie { display: grid; gap: 4px; margin-top: auto; }
-.alkira-perfil { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 12px; border-radius: 8px; background: #1b294b; }
-.alkira-avatar { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #2563eb; color: #fff; font-size: 12px; }
-.alkira-perfil strong, .alkira-perfil small { display: block; }
+.alkira-menu-pie { display: grid; gap: 6px; margin-top: auto; padding-top: 12px; flex-shrink: 0; }
+.alkira-menu-perfil { display: grid; gap: 4px; padding: 6px; border-radius: 8px; background: #131f3e; border: 1px solid rgba(255,255,255,.07); }
+.alkira-perfil { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; border: 0; border-radius: 8px; background: #1b294b; text-align: left; cursor: pointer; color: inherit; }
+.alkira-perfil:hover { background: #22335c; }
+.alkira-avatar { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #2563eb; color: #fff; font-size: 12px; flex-shrink: 0; }
+.alkira-perfil-info { flex: 1; min-width: 0; }
+.alkira-perfil strong, .alkira-perfil small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .alkira-perfil strong { color: #fff; font-size: 12px; }
 .alkira-perfil small { color: #aabbd7; font-size: 10px; }
-.alkira-zona-principal { min-width: 0; flex: 1; }
-.alkira-barra-superior { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-height: 75px; padding: 14px 28px; border-bottom: 1px solid var(--alkira-borde); background: #fff; }
+.alkira-zona-principal { min-width: 0; flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; overscroll-behavior: none; }
+.alkira-barra-superior { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-height: 75px; padding: 14px 28px; border-bottom: 1px solid var(--alkira-borde); background: #fff; flex-shrink: 0; }
 .alkira-barra-titulos strong, .alkira-barra-titulos small, .alkira-usuario-datos strong, .alkira-usuario-datos small { display: block; }
 .alkira-barra-titulos strong { color: var(--alkira-texto); font-size: 14px; }
 .alkira-barra-titulos small { color: #8a98b3; font-size: 11px; margin-top: 3px; }
@@ -34,7 +42,11 @@
 .alkira-usuario-datos { text-align: right; }
 .alkira-usuario-datos strong { font-size: 12px; }
 .alkira-usuario-datos small { font-size: 10px; color: #8a98b3; }
-.alkira-contenido { padding: 28px; }
+.alkira-contenido { padding: 28px; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: none; }
+.alkira-contenido::-webkit-scrollbar { width: 6px; }
+.alkira-contenido::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.alkira-contenido::-webkit-scrollbar-track { background: transparent; }
+.alkira-contenido::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
 .alkira-titulo-pagina { display: flex; align-items: start; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
 .alkira-titulo-pagina h1 { font-size: 22px; font-weight: 700; color: var(--alkira-texto); margin-bottom: 6px; }
 .alkira-titulo-pagina p { font-size: 13px; color: #8393af; margin: 0; }
@@ -44,7 +56,7 @@
 .alkira-tarjeta-pendiente p { color: #63728d; font-size: 14px; }
 .alkira-boton-menu-movil, .alkira-fondo-menu { display: none; }
 
-.alkira-login-pagina { min-height: 100vh; padding: 28px; display: grid; place-items: center; background: #f4f7fc; }
+.alkira-login-pagina { height: 100dvh; overflow-y: auto; overscroll-behavior: none; padding: 28px; display: grid; place-items: center; background: #f4f7fc; }
 .alkira-login-contenedor { max-width: 1060px; width: 100%; min-height: 630px; overflow: hidden; border: 1px solid var(--alkira-borde); border-radius: 16px; background: #fff; box-shadow: 0 18px 54px rgba(17,35,70,.10); }
 .alkira-login-presentacion { display: flex; flex-direction: column; justify-content: space-between; gap: 35px; min-height: 630px; padding: 45px; background: linear-gradient(145deg,#101d40 0%,#09142f 100%); color: #fff; }
 .alkira-login-marca { font-weight: 800; font-size: 22px; letter-spacing: .07em; }

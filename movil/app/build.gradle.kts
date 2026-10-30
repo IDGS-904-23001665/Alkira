@@ -5,11 +5,14 @@ plugins {
 }
 
 android {
-    namespace = "com.example.pantallasmovil"
+    namespace = "com.alkira.movil"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.pantallasmovil"
+        applicationId = if (providers.gradleProperty("alkiraPruebas").orNull == "true")
+            "com.alkira.movil.pruebas" else "com.alkira.movil"
+        val apiUrl = providers.gradleProperty("alkiraApiUrl").orElse("http://192.168.1.6:8000").get()
+        buildConfigField("String", "API_URL", "new String(\"${apiUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\")")
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -36,10 +39,12 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
+    implementation("com.google.zxing:core:3.5.3")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

@@ -79,32 +79,26 @@ function App() {
     )
   }
 
-  // Proteger el panel administrativo por rol.
-  if (usuario.tipoUsuario !== 'administrador') {
+  // Solo los administradores y guardias pueden usar este panel web.
+  if (usuario.tipoUsuario !== 'administrador' && usuario.tipoUsuario !== 'guardia') {
     return (
       <main className="d-flex flex-column justify-content-center align-items-center min-vh-100">
         <h2>Acceso restringido</h2>
-
-        <p>
-          Este panel está disponible únicamente
-          para administradores.
-        </p>
-
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={salir}
-        >
+        <p>Este panel está disponible únicamente para personal autorizado.</p>
+        <button type="button" className="btn btn-primary" onClick={salir}>
           Cerrar sesión
         </button>
       </main>
     )
   }
 
-  // Buscar la sección activa del panel administrativo.
-  const seccion =
-    SECCIONES.find(({ id }) => id === seccionActiva) ??
-    SECCIONES[0]
+  // Los guardias únicamente pueden abrir la sección de Seguridad QR.
+  const seccionesPermitidas = usuario.tipoUsuario === 'guardia'
+    ? SECCIONES.filter(({ id }) => id === 'seguridad')
+    : SECCIONES
+
+  const seccion = seccionesPermitidas.find(({ id }) => id === seccionActiva)
+    ?? seccionesPermitidas[0]
 
   return (
     <div className="alkira-aplicacion">
@@ -123,7 +117,7 @@ function App() {
         />
 
         <main className="alkira-contenido">
-          <VistaContenido seccion={seccion} />
+          <VistaContenido seccion={seccion} usuario={usuario} />
         </main>
       </div>
     </div>

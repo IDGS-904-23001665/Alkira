@@ -1,19 +1,25 @@
 
-# React + Vite
+# React y Vite
 node_modules/
 dist/
 .vite/
 coverage/
 
-# Configuraciones privadas
+# Variables de entorno y configuraciones privadas
 .env
 .env.*
 !.env.example
 !.env.ejemplo
 /backend/config/*.local.php
 
+# Credenciales locales de Cypress
+/AWP/cypress.env.json
+/AWP/cypress/screenshots/
+/AWP/cypress/videos/
+
 # Android Studio y Gradle
 .gradle/
+.kotlin/
 build/
 local.properties
 *.iml
@@ -22,7 +28,17 @@ local.properties
 .cxx/
 captures/
 
-# Archivos locales
+# Claves privadas de firma Android
+*.jks
+*.keystore
+key.properties
+keystore.properties
+
+# Documentos privados de contratos
+/backend/documentos/contratos/*
+!/backend/documentos/contratos/.gitignore
+
+# Archivos temporales
 .vscode/
 *.log
 .DS_Store
