@@ -43,3 +43,6 @@ keystore.properties
 *.log
 .DS_Store
 Thumbs.db
+
+# Credenciales locales de Cypress
+/AWP/cypress.env.json
