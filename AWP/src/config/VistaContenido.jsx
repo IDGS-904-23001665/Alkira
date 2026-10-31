@@ -1,4 +1,6 @@
 import PaginaPendiente from '../pages/PaginaPendiente.jsx'
+import IndicadoresKdd from '../modules/modulo8/IndicadoresKdd.jsx'
+
 import Propiedades from '../modules/modulo1/Propiedades.jsx'
 import Comprobantes from '../pages/Comprobantes.jsx'
 import SeguridadQr from '../modules/accesosQr/SeguridadQr.jsx'
@@ -9,6 +11,7 @@ const PANTALLAS = {
   comprobantes: Comprobantes,
   seguridad: SeguridadQr,
   incidencias: Incidencias,
+  reportes: IndicadoresKdd,
 }
 
 function VistaContenido({ seccion, usuario }) {

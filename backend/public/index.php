@@ -7,6 +7,7 @@ header('X-Content-Type-Options: nosniff');
 
 require_once dirname(__DIR__) . '/config/Conexion.php';
 require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
+require_once dirname(__DIR__) . '/controllers/KddControlador.php';
 require_once dirname(__DIR__) . '/repos/ComprobantesRepositorio.php';
 require_once dirname(__DIR__) . '/controllers/ComprobantesMovilControlador.php';
 require_once dirname(__DIR__) . '/controllers/InmueblesControlador.php';
@@ -61,6 +62,14 @@ try {
         ['POST', '/api/comprobantes/enviar-movil'],
     ];
 
+    $rutasKdd = [
+        ['GET', '/api/kdd/indicadores'],
+        ['GET', '/api/kdd/inmuebles'],
+        ['GET', '/api/kdd/financiero'],
+        ['GET', '/api/kdd/operativo'],
+        ['GET', '/api/kdd/reportes'],
+    ];
+
     $rutaAdeudos = $ruta === '/api/adeudos/pendientes' && $metodo === 'GET';
 
     $rutaHistorialContratos = $metodo === 'GET' && is_string($ruta) && (
@@ -69,16 +78,21 @@ try {
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
 
-    if (!$rutaHu01 && !$rutaResidentes && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true)) {
+    if (!$rutaHu01 && !$rutaResidentes && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
     }
 
-    $rutaClave = dirname(__DIR__) . '/config/autenticacion.local.php';
+    $rutaClave = dirname(__DIR__)
+        . '/config/autenticacion.local.php';
+
     if (!is_file($rutaClave)) {
-        throw new RuntimeException('Falta la configuración de autenticación.');
+        throw new RuntimeException(
+            'Falta la configuración de autenticación.'
+        );
     }
+
     $configuracion = require $rutaClave;
     if (
         !is_array($configuracion) ||
@@ -89,10 +103,58 @@ try {
     }
 
     $conexion = Conexion::obtenerConexion();
+
     $repositorio = new UsuariosRepositorio($conexion);
-    $servicio = new AutenticacionServicio($repositorio, $configuracion['claveJwt']);
+
+    $servicio = new AutenticacionServicio(
+        $repositorio,
+        $configuracion['claveJwt']
+    );
+
     $controlador = new AutenticacionControlador($servicio);
 
+    // ============================================
+    // RUTAS DEL MODULO KDD
+    // ============================================
+
+    if (in_array($ruta, [
+        '/api/kdd/indicadores',
+        '/api/kdd/inmuebles',
+        '/api/kdd/financiero',
+        '/api/kdd/operativo',
+        '/api/kdd/reportes'
+    ], true)) {
+        $repositorioKdd = new KddRepositorio($conexion);
+
+        $servicioKdd = new KddServicio($repositorioKdd);
+
+        $controladorKdd = new KddControlador(
+            $servicioKdd,
+            $servicio
+        );
+
+        if ($ruta === '/api/kdd/indicadores') {
+            $controladorKdd->indicadores();
+
+        } elseif ($ruta === '/api/kdd/inmuebles') {
+            $controladorKdd->inmuebles();
+
+        } elseif ($ruta === '/api/kdd/financiero') {
+            $controladorKdd->financieroFiltrado();
+
+        } elseif ($ruta === '/api/kdd/operativo') {
+            $controladorKdd->operativoFiltrado();
+
+        } elseif ($ruta === '/api/kdd/reportes') {
+            $controladorKdd->reportes();
+        }
+
+        exit;
+    }
+
+    // ============================================
+    // RUTAS DE AUTENTICACION
+    // ============================================
     if ($rutaHu01) {
         $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
         if ($usuario === null) {
@@ -401,6 +463,7 @@ try {
 
     if ($ruta === '/api/auth/login') {
         $controlador->ingresar();
+
     } elseif ($ruta === '/api/auth/yo') {
         $controlador->sesion();
     } elseif ($ruta === '/api/auth/salir') {
@@ -410,8 +473,13 @@ try {
     } elseif ($ruta === '/api/auth/yo-movil') {
         $controlador->sesionMovil();
     }
+
 } catch (Throwable $error) {
     error_log($error->getMessage());
+
     http_response_code(500);
-    echo json_encode(['mensaje' => 'No fue posible procesar la solicitud.']);
+
+    echo json_encode([
+        'mensaje' => 'No fue posible procesar la solicitud.'
+    ]);
 }
