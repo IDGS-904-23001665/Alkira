@@ -1,0 +1,11 @@
+.alkira-cierre-modal { width: min(850px, 100%); }
+.alkira-cierre-contenido { display: grid; gap: 17px; padding: 22px 24px 24px; }
+.alkira-cierre-encabezado { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.alkira-cierre-material { display: grid; grid-template-columns: minmax(220px,2fr) minmax(100px,1fr) minmax(145px,1fr); gap: 12px; padding: 14px; border: 1px solid #e1e9f2; border-radius: 10px; }
+.alkira-cierre-material label, .alkira-cierre-comentario { display: grid; gap: 7px; font-size: 13px; font-weight: 600; }
+.alkira-cierre-renglon-acciones { grid-column: 1/-1; display: flex; gap: 12px; justify-content: flex-end; align-items: center; font-size: 13px; }
+.alkira-cierre-total { margin: 0; padding: 14px; border-radius: 8px; background: #eaf4ed; color: #1f6540; font-weight: 700; text-align: right; }
+.alkira-cierre-checkbox { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; }
+.alkira-cierre-checkbox input { margin-top: 4px; flex-shrink: 0; }
+.alkira-cierre-confirmacion { border-top: 1px solid #e4eaf1; padding-top: 14px; }
+@media (max-width: 720px) { .alkira-cierre-material { grid-template-columns: minmax(0,1fr); } .alkira-cierre-renglon-acciones { grid-column:auto; } .alkira-cierre-contenido { padding: 16px; } }

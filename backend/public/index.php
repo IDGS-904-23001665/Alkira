@@ -17,6 +17,9 @@ require_once dirname(__DIR__) . '/controllers/IncidenciasControlador.php';
 require_once dirname(__DIR__) . '/controllers/ResidentesControlador.php';
 require_once dirname(__DIR__) . '/services/AutenticacionSolicitud.php';
 require_once dirname(__DIR__) . '/controllers/AccesosQrControlador.php';
+require_once dirname(__DIR__) . '/controllers/TicketsControlador.php';
+require_once dirname(__DIR__) . '/controllers/OrdenesTrabajoControlador.php';
+require_once dirname(__DIR__) . '/controllers/CierreMantenimientoControlador.php';
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -26,6 +29,31 @@ $rutaHu01 = is_string($ruta) && (
     || preg_match('#^/api/unidades/[1-9][0-9]*(?:/asignaciones)?$#D', $ruta) === 1
     || preg_match('#^/api/asignaciones/[1-9][0-9]*/finalizar$#D', $ruta) === 1
     || $ruta === '/api/usuarios/buscar'
+);
+
+$rutaTickets = is_string($ruta) && (
+    ($metodo === 'GET' && (
+        $ruta === '/api/tickets'
+        || preg_match('#^/api/tickets/[1-9][0-9]*/historial$#D', $ruta) === 1
+    ))
+    || ($metodo === 'POST'
+        && preg_match('#^/api/tickets/[1-9][0-9]*/firma$#D', $ruta) === 1)
+);
+
+$rutaOrdenesTrabajo = is_string($ruta) && (
+    ($metodo === 'GET' && in_array($ruta, [
+        '/api/mantenimiento/tickets',
+        '/api/mantenimiento/tecnicos',
+    ], true))
+    || ($metodo === 'POST'
+        && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/asignar$#D', $ruta) === 1)
+);
+
+$rutaCierreMantenimiento = is_string($ruta) && (
+    ($metodo === 'GET'
+        && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/materiales$#D', $ruta) === 1)
+    || ($metodo === 'POST'
+        && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/cerrar$#D', $ruta) === 1)
 );
 
 $rutaResidentes = $ruta === '/api/incidencias/residentes';
@@ -78,7 +106,7 @@ try {
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
 
-    if (!$rutaHu01 && !$rutaResidentes && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
+    if (!$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -187,6 +215,42 @@ try {
             exit;
         }
         (new ResidentesControlador(new ResidentesServicio(new ResidentesRepositorio($conexion))))->procesar($metodo);
+        exit;
+    }
+
+    if ($rutaOrdenesTrabajo) {
+        $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesión administrativa no válida o vencida.']);
+            exit;
+        }
+        $controladorOrdenes = new OrdenesTrabajoControlador(
+            new OrdenesTrabajoServicio(new OrdenesTrabajoRepositorio($conexion))
+        );
+        $controladorOrdenes->procesar($metodo, $ruta, $usuario);
+        exit;
+    }
+
+    if ($rutaCierreMantenimiento) {
+        $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesión administrativa no válida o vencida.']);
+            exit;
+        }
+        (new CierreMantenimientoControlador(
+            new CierreMantenimientoServicio(new CierreMantenimientoRepositorio($conexion))
+        ))->procesar($metodo, $ruta, $usuario);
+        exit;
+    }
+
+    if ($rutaTickets) {
+        $controladorTickets = new TicketsControlador(
+            $servicio,
+            new TicketsServicio(new TicketsRepositorio($conexion))
+        );
+        $controladorTickets->procesar($metodo, $ruta);
         exit;
     }
 

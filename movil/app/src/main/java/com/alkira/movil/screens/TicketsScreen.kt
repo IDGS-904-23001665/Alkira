@@ -2,10 +2,9 @@ package com.alkira.movil.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -13,528 +12,307 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import com.alkira.movil.red.ErrorApi
+import com.alkira.movil.red.MovimientoTicket
+import com.alkira.movil.red.TicketMantenimiento
+import com.alkira.movil.red.TicketsApi
 import com.alkira.movil.ui.theme.*
+import java.io.IOException
+
+private fun nombreEstado(estado: String): String = when (estado) {
+    "abierto" -> "Abierto"
+    "asignado" -> "Asignado"
+    "en_proceso" -> "En proceso"
+    "pendiente_revision" -> "En evaluación"
+    "cerrado" -> "Cerrado"
+    "cancelado" -> "Cancelado"
+    else -> estado.replace('_', ' ').replaceFirstChar { it.uppercase() }
+}
+
+private fun fechaLegible(fecha: String?): String =
+    fecha?.replace('T', ' ')?.take(16)?.takeIf { it.isNotBlank() } ?: "Sin programar"
+
+private fun colorEstado(estado: String): Color = when (estado) {
+    "cerrado" -> AlkiraSuccessGreen
+    "cancelado" -> AlkiraDangerRed
+    "abierto" -> AlkiraWarningAmber
+    else -> AlkiraPrimaryBlue
+}
 
 @Composable
 fun TicketsScreen(
     modifier: Modifier = Modifier,
     onNavigateBack: () -> Unit = {}
 ) {
-    var selectedTab by remember { mutableStateOf("En Atención") }
-    var showQuoteModal by remember { mutableStateOf(false) }
-    var showSignatureModal by remember { mutableStateOf(false) }
+    var tickets by remember { mutableStateOf<List<TicketMantenimiento>>(emptyList()) }
+    var cargando by remember { mutableStateOf(true) }
+    var errorCarga by remember { mutableStateOf<String?>(null) }
+    var numeroConsulta by remember { mutableIntStateOf(0) }
+    var filtroSeleccionado by remember { mutableStateOf("Todos") }
+    var idSeleccionado by remember { mutableStateOf<Int?>(null) }
+    var ticketParaFirmar by remember { mutableStateOf<TicketMantenimiento?>(null) }
+    var mensajeConformidad by remember { mutableStateOf<String?>(null) }
+    var movimientos by remember { mutableStateOf<List<MovimientoTicket>>(emptyList()) }
+    var cargandoMovimientos by remember { mutableStateOf(false) }
+    var errorMovimientos by remember { mutableStateOf<String?>(null) }
+    val vistaPrevia = LocalInspectionMode.current
 
-    // Estados de formulario
-    var quoteAmount by remember { mutableStateOf("1,450.00") }
-    var materialsCost by remember { mutableStateOf("650.00") }
-    var laborCost by remember { mutableStateOf("800.00") }
-    var isVerifiedSite by remember { mutableStateOf(true) }
-    var isPartsOriginal by remember { mutableStateOf(true) }
-    var isAreaClean by remember { mutableStateOf(false) }
-    var rating by remember { mutableStateOf(5) }
-    var ticketStatus by remember { mutableStateOf("En Proceso") }
+    LaunchedEffect(numeroConsulta) {
+        if (vistaPrevia) {
+            cargando = false
+            return@LaunchedEffect
+        }
+        cargando = true
+        errorCarga = null
+        try {
+            tickets = TicketsApi.listar()
+        } catch (error: ErrorApi) {
+            tickets = emptyList()
+            errorCarga = when (error.codigoHttp) {
+                401 -> "Tu sesión venció. Cierra sesión e inicia de nuevo."
+                403 -> "Tu usuario no tiene permiso para consultar tickets."
+                else -> error.message ?: "No se pudieron cargar los tickets."
+            }
+        } catch (_: IOException) {
+            tickets = emptyList()
+            errorCarga = "No se pudo conectar con el servidor PHP. Verifica la red."
+        } catch (_: Exception) {
+            tickets = emptyList()
+            errorCarga = "No fue posible leer los tickets recibidos."
+        } finally {
+            cargando = false
+        }
+    }
+
+    LaunchedEffect(idSeleccionado, numeroConsulta) {
+        val idTicket = idSeleccionado
+        movimientos = emptyList()
+        errorMovimientos = null
+        if (idTicket == null || vistaPrevia) return@LaunchedEffect
+        cargandoMovimientos = true
+        try {
+            movimientos = TicketsApi.historial(idTicket)
+        } catch (error: ErrorApi) {
+            errorMovimientos = error.message ?: "No se pudo consultar la bitácora."
+        } catch (_: IOException) {
+            errorMovimientos = "No se pudo conectar para consultar la bitácora."
+        } catch (_: Exception) {
+            errorMovimientos = "No fue posible leer la bitácora."
+        } finally {
+            cargandoMovimientos = false
+        }
+    }
+
+    val ticketsFiltrados = tickets.filter { ticket ->
+        when (filtroSeleccionado) {
+            "Pendientes" -> ticket.estado == "abierto"
+            "En atención" -> ticket.estado in setOf("asignado", "en_proceso", "pendiente_revision")
+            "Concluidos" -> ticket.estado == "cerrado"
+            else -> true
+        }
+    }
+
+    ticketParaFirmar?.let { ticket ->
+        FirmaConformidadDialog(
+            ticket = ticket,
+            onCerrar = { ticketParaFirmar = null },
+            onFirmaRegistrada = { mensaje ->
+                ticketParaFirmar = null
+                mensajeConformidad = mensaje
+                numeroConsulta += 1
+            }
+        )
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(AlkiraCanvasBg)
-            .padding(horizontal = 20.dp, vertical = 16.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Encabezado con navegación de retorno y estatus
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Gestión de Mantenimiento",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlkiraTextPrimary
-                )
-                Text(
-                    text = "Ticket #TK-2026-084",
-                    fontSize = 12.sp,
-                    color = AlkiraTextSecondary
-                )
-            }
-
-            // Status Pill con punto indicador (estilo web)
-            Surface(
-                color = if (ticketStatus == "Concluido") AlkiraGreenSoft else AlkiraAmberSoft,
-                shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (ticketStatus == "Concluido") AlkiraSuccessGreen.copy(alpha = 0.3f) else AlkiraWarningAmber.copy(alpha = 0.3f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .background(
-                                if (ticketStatus == "Concluido") AlkiraSuccessGreen else AlkiraWarningAmber,
-                                CircleShape
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = ticketStatus,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (ticketStatus == "Concluido") AlkiraGreenText else AlkiraAmberText
-                    )
-                }
-            }
-        }
-
-        // Tabs de filtro de estado
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AlkiraSurfaceWhite, RoundedCornerShape(10.dp))
-                .border(1.dp, AlkiraBorderSubtle, RoundedCornerShape(10.dp))
-                .padding(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            listOf("Pendiente", "En Atención", "Concluido").forEach { tab ->
-                val isSelected = selectedTab == tab
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            if (isSelected) AlkiraPrimaryBlue else Color.Transparent,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { selectedTab = tab }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = tab,
-                        fontSize = 12.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.White else AlkiraTextSecondary
-                    )
-                }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Gestión de Mantenimiento", fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold, color = AlkiraTextPrimary)
+                Text("Seguimiento de tus tickets y visitas técnicas",
+                    fontSize = 12.sp, color = AlkiraTextSecondary)
+            }
+            TextButton(onClick = { numeroConsulta += 1 }, enabled = !cargando) {
+                Text("Actualizar", color = AlkiraPrimaryBlue)
             }
         }
 
-        // Card 1: Detalle del Problema
-        Card(
-            colors = CardDefaults.cardColors(containerColor = AlkiraSurfaceWhite),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, AlkiraBorderSubtle, RoundedCornerShape(14.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Avería Reportada",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AlkiraTextSecondary
-                    )
-                    Surface(
-                        color = AlkiraRedSoft,
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = "Prioridad Alta",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AlkiraDangerRed,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Fuga de agua en tubería de baño principal",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlkiraTextPrimary
-                )
-                Text(
-                    text = "Ubicación: Torre B • Departamento 402",
-                    fontSize = 12.sp,
-                    color = AlkiraTextSecondary,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-
-                HorizontalDivider(
-                    color = AlkiraBorderSubtle,
-                    modifier = Modifier.padding(vertical = 12.dp)
-                )
-
-                // Proveedor asignado
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(AlkiraBlueSoft, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "PL",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = AlkiraPrimaryBlue
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "Plomería Express del Bajío",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AlkiraTextPrimary
-                        )
-                        Text(
-                            text = "Téc. Roberto Mendoza • Visita: Hoy 16:30 hrs",
-                            fontSize = 11.sp,
-                            color = AlkiraTextSecondary
-                        )
-                    }
-                }
-            }
-        }
-
-        // Card 2: Presupuesto y Cotización
-        Card(
-            colors = CardDefaults.cardColors(containerColor = AlkiraSurfaceWhite),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, AlkiraBorderSubtle, RoundedCornerShape(14.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Presupuesto Autorizado",
-                            fontSize = 12.sp,
-                            color = AlkiraTextSecondary
-                        )
-                        Text(
-                            text = "$$quoteAmount MXN",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AlkiraTextPrimary
-                        )
-                    }
-                    OutlinedButton(
-                        onClick = { showQuoteModal = true },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text("Ver Desglose", fontSize = 12.sp, color = AlkiraPrimaryBlue)
-                    }
-                }
-            }
-        }
-
-        // Card 3: Checklist de Verificación y Conformidad
-        Card(
-            colors = CardDefaults.cardColors(containerColor = AlkiraSurfaceWhite),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, AlkiraBorderSubtle, RoundedCornerShape(14.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Checklist de Verificación en Sitio",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AlkiraTextPrimary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { isVerifiedSite = !isVerifiedSite }
-                        .padding(vertical = 4.dp)
-                ) {
-                    Checkbox(
-                        checked = isVerifiedSite,
-                        onCheckedChange = { isVerifiedSite = it },
-                        colors = CheckboxDefaults.colors(checkedColor = AlkiraPrimaryBlue)
-                    )
-                    Text(
-                        text = "Fuga sellada y presión de agua verificada",
-                        fontSize = 12.sp,
-                        color = AlkiraTextPrimary
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { isPartsOriginal = !isPartsOriginal }
-                        .padding(vertical = 4.dp)
-                ) {
-                    Checkbox(
-                        checked = isPartsOriginal,
-                        onCheckedChange = { isPartsOriginal = it },
-                        colors = CheckboxDefaults.colors(checkedColor = AlkiraPrimaryBlue)
-                    )
-                    Text(
-                        text = "Refacciones nuevas colocadas con garantía",
-                        fontSize = 12.sp,
-                        color = AlkiraTextPrimary
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { isAreaClean = !isAreaClean }
-                        .padding(vertical = 4.dp)
-                ) {
-                    Checkbox(
-                        checked = isAreaClean,
-                        onCheckedChange = { isAreaClean = it },
-                        colors = CheckboxDefaults.colors(checkedColor = AlkiraPrimaryBlue)
-                    )
-                    Text(
-                        text = "Área de trabajo limpia y sin escombros",
-                        fontSize = 12.sp,
-                        color = AlkiraTextPrimary
-                    )
-                }
-            }
+        if (mensajeConformidad != null) {
+            TarjetaAviso(
+                mensajeConformidad.orEmpty(),
+                AlkiraBlueSoft,
+                AlkiraPrimaryBlue
+            )
         }
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp, bottom = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedButton(
-                onClick = { ticketStatus = "Rechazado / En Revisión" },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = AlkiraSurfaceWhite,
-                    contentColor = AlkiraDangerRed
-                ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, AlkiraBorderSubtle)
-            ) {
-                Text(
-                    text = "Rechazar",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                )
-            }
-
-            Button(
-                onClick = { showSignatureModal = true },
-                modifier = Modifier.weight(1.4f),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AlkiraPrimaryBlue)
-            ) {
-                Text(
-                    text = "Finalizar y Firmar",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = Color.White
+            listOf("Todos", "Pendientes", "En atención", "Concluidos").forEach { filtro ->
+                val seleccionado = filtro == filtroSeleccionado
+                FilterChip(
+                    selected = seleccionado,
+                    onClick = { filtroSeleccionado = filtro },
+                    label = { Text(filtro, fontSize = 12.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AlkiraBlueSoft,
+                        selectedLabelColor = AlkiraPrimaryBlue
+                    )
                 )
             }
         }
-    }
 
-    // ==========================================
-    // SUBVENTANA 1: Modal de Desglose de Cotización
-    // ==========================================
-    if (showQuoteModal) {
-        Dialog(onDismissRequest = { showQuoteModal = false }) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = AlkiraSurfaceWhite,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(
-                        text = "Detalle de Cotización",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AlkiraTextPrimary
-                    )
-                    Text(
-                        text = "Valores aprobados por administración",
-                        fontSize = 12.sp,
-                        color = AlkiraTextSecondary,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
+        if (cargando) {
+            Box(Modifier.fillMaxWidth().padding(28.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = AlkiraPrimaryBlue)
+            }
+        } else if (errorCarga != null) {
+            TarjetaAviso(errorCarga ?: "Ocurrió un error.", AlkiraRedSoft, AlkiraDangerRed)
+        } else if (ticketsFiltrados.isEmpty()) {
+            TarjetaAviso(
+                if (tickets.isEmpty()) "Aún no tienes tickets de mantenimiento asignados o reportados."
+                else "No hay tickets en este filtro.",
+                AlkiraSurfaceWhite, AlkiraTextSecondary
+            )
+        } else {
+            Text(
+                "${ticketsFiltrados.size} ticket(s)",
+                fontSize = 12.sp,
+                color = AlkiraTextSecondary
+            )
 
-                    OutlinedTextField(
-                        value = materialsCost,
-                        onValueChange = { materialsCost = it },
-                        label = { Text("Materiales y Refacciones (MXN)") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 10.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = laborCost,
-                        onValueChange = { laborCost = it },
-                        label = { Text("Mano de Obra Certificada (MXN)") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { showQuoteModal = false }) {
-                            Text("Cancelar", color = AlkiraTextSecondary)
-                        }
-                        Button(
-                            onClick = {
-                                val mat = materialsCost.toDoubleOrNull() ?: 0.0
-                                val lab = laborCost.toDoubleOrNull() ?: 0.0
-                                quoteAmount = String.format("%.2f", mat + lab)
-                                showQuoteModal = false
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = AlkiraPrimaryBlue)
+            ticketsFiltrados.forEach { ticket ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().border(
+                        1.dp, AlkiraBorderSubtle, RoundedCornerShape(14.dp)
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = AlkiraSurfaceWhite)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Guardar")
+                            Text("Ticket #${ticket.idTicket}", fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold, color = AlkiraTextSecondary)
+                            Surface(color = colorEstado(ticket.estado).copy(alpha = 0.10f),
+                                shape = RoundedCornerShape(20.dp)) {
+                                Text(nombreEstado(ticket.estado), fontSize = 11.sp,
+                                    color = colorEstado(ticket.estado), fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                            }
+                        }
+
+                        Text(ticket.titulo, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                            color = AlkiraTextPrimary)
+                        Text(ticket.descripcion, fontSize = 12.sp, color = AlkiraTextSecondary)
+                        Text("Prioridad: ${ticket.urgencia.replaceFirstChar { it.uppercase() }}",
+                            fontSize = 12.sp, color = AlkiraTextSecondary)
+
+                        val ubicacion = listOfNotNull(ticket.nombreInmueble, ticket.numeroUnidad)
+                            .filter { it.isNotBlank() }.joinToString(" · ")
+                        if (ubicacion.isNotBlank()) {
+                            Text("Ubicación: $ubicacion", fontSize = 12.sp,
+                                color = AlkiraTextSecondary)
+                        }
+
+                        HorizontalDivider(color = AlkiraBorderSubtle)
+                        Text("Técnico: ${ticket.nombreTecnico ?: "Sin asignar"}",
+                            fontSize = 13.sp, color = AlkiraTextPrimary)
+                        Text("Visita programada: ${fechaLegible(ticket.fechaProgramada)}",
+                            fontSize = 12.sp, color = AlkiraTextSecondary)
+                        if (!ticket.descripcionTrabajo.isNullOrBlank()) {
+                            Text("Trabajo: ${ticket.descripcionTrabajo}",
+                                fontSize = 12.sp, color = AlkiraTextSecondary)
+                        }
+
+                        if (ticket.puedeFirmar) {
+                            Button(
+                                onClick = { ticketParaFirmar = ticket },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = AlkiraPrimaryBlue)
+                            ) {
+                                Text("Firmar conformidad")
+                            }
+                        } else if (ticket.tieneFirma) {
+                            Text(
+                                "La conformidad ya fue registrada. Pendiente de revisión administrativa.",
+                                color = AlkiraTextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+
+                        TextButton(onClick = {
+                            idSeleccionado = if (idSeleccionado == ticket.idTicket) null else ticket.idTicket
+                        }) {
+                            Text(if (idSeleccionado == ticket.idTicket) "Ocultar bitácora"
+                            else "Ver bitácora de estados", color = AlkiraPrimaryBlue)
+                        }
+
+                        if (idSeleccionado == ticket.idTicket) {
+                            HorizontalDivider(color = AlkiraBorderSubtle)
+                            Text("Historial del ticket", fontWeight = FontWeight.SemiBold,
+                                color = AlkiraTextPrimary, fontSize = 13.sp)
+                            if (cargandoMovimientos) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp),
+                                    color = AlkiraPrimaryBlue, strokeWidth = 2.dp)
+                            } else if (errorMovimientos != null) {
+                                Text(errorMovimientos.orEmpty(), color = AlkiraDangerRed, fontSize = 12.sp)
+                            } else if (movimientos.isEmpty()) {
+                                Text("Todavía no hay movimientos registrados desde que se habilitó la bitácora.",
+                                    fontSize = 12.sp, color = AlkiraTextSecondary)
+                            } else {
+                                movimientos.forEach { movimiento ->
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(nombreEstado(movimiento.estadoNuevo),
+                                            fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+                                            color = colorEstado(movimiento.estadoNuevo))
+                                        Text(
+                                            "${fechaLegible(movimiento.fechaCambio)} · " +
+                                                    (movimiento.estadoAnterior?.let {
+                                                        "Antes: ${nombreEstado(it)}"
+                                                    } ?: "Registro inicial"),
+                                            fontSize = 11.sp, color = AlkiraTextSecondary
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    // ==========================================
-    // SUBVENTANA 2: Modal de Firma de Conformidad
-    // ==========================================
-    if (showSignatureModal) {
-        Dialog(onDismissRequest = { showSignatureModal = false }) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = AlkiraSurfaceWhite,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(
-                        text = "Firma de Conformidad",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AlkiraTextPrimary
-                    )
-                    Text(
-                        text = "El inquilino valida la resolución satisfactoria.",
-                        fontSize = 12.sp,
-                        color = AlkiraTextSecondary,
-                        modifier = Modifier.padding(bottom = 14.dp)
-                    )
-
-                    // Simulación de lienzo de firma
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(110.dp)
-                            .background(AlkiraCanvasBg, RoundedCornerShape(8.dp))
-                            .border(1.dp, AlkiraBorderStrong, RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "✍️ [Firma Digital Capturada]",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AlkiraPrimaryBlue
-                            )
-                            Text(
-                                text = "Inquilino: Depto 402 • Token: #SIG-8942",
-                                fontSize = 10.sp,
-                                color = AlkiraTextSecondary
-                            )
-                        }
-                    }
-
-                    // Calificación
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Calificación del Servicio:",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AlkiraTextPrimary
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        (1..5).forEach { star ->
-                            Text(
-                                text = if (star <= rating) "★" else "☆",
-                                fontSize = 28.sp,
-                                color = if (star <= rating) AlkiraWarningAmber else AlkiraBorderStrong,
-                                modifier = Modifier
-                                    .padding(horizontal = 4.dp)
-                                    .clickable { rating = star }
-                            )
-                        }
-                    }
-
-                    Button(
-                        onClick = {
-                            ticketStatus = "Concluido"
-                            showSignatureModal = false
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AlkiraSuccessGreen)
-                    ) {
-                        Text("Confirmar y Cerrar Ticket", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
+        Text(
+            "La firma envía el ticket a evaluación; el cierre definitivo corresponde a administración.",
+            fontSize = 11.sp,
+            color = AlkiraTextMuted
+        )
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun TicketsScreenPreview() {
-    PantallasMovilTheme {
-        TicketsScreen()
+private fun TarjetaAviso(mensaje: String, fondo: Color, colorTexto: Color) {
+    Card(colors = CardDefaults.cardColors(containerColor = fondo),
+        modifier = Modifier.fillMaxWidth()) {
+        Text(mensaje, modifier = Modifier.padding(18.dp), color = colorTexto, fontSize = 13.sp)
     }
 }
