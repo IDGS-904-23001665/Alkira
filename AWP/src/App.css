@@ -97,3 +97,22 @@
   .alkira-login-pagina { padding: 12px; }
   .alkira-titulo-pagina { flex-wrap: wrap; }
 }
+
+/* Logotipo oficial de ALKIRA */
+.alkira-logo-login {
+  display: block;
+  width: 83px;
+  height: 83px;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.alkira-marca-logo {
+  display: block;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #fff;
+}

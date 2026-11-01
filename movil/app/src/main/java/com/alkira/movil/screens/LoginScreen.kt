@@ -1,5 +1,6 @@
 package com.alkira.movil.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -43,6 +46,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.alkira.movil.R
 import com.alkira.movil.ui.theme.AlkiraBlueSoft
 import com.alkira.movil.ui.theme.AlkiraBorderStrong
 import com.alkira.movil.ui.theme.AlkiraBorderSubtle
@@ -113,35 +117,12 @@ fun LoginScreen(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Espacio provisional para colocar el logotipo definitivo de ALKIRA.
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = AlkiraBlueSoft,
-                    border = BorderStroke(1.dp, AlkiraBorderSubtle),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(112.dp)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        Text(
-                            text = "Logo ALKIRA",
-                            fontWeight = FontWeight.SemiBold,
-                            color = AlkiraDarkNavy,
-                            fontSize = 16.sp
-                        )
-                        Spacer(modifier = Modifier.height(5.dp))
-                        Text(
-                            text = "Coloca tu imagen en este espacio",
-                            color = AlkiraTextSecondary,
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.logo_alkira),
+                    contentDescription = "Logotipo de ALKIRA",
+                    modifier = Modifier.size(92.dp),
+                    contentScale = ContentScale.Fit
+                )
 
                 Spacer(modifier = Modifier.height(26.dp))
 

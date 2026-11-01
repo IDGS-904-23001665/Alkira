@@ -55,6 +55,9 @@ function Login({ onIniciarSesion, errorConexion = '' }) {
 
           <section className="col-lg-6 alkira-login-formulario-seccion">
             <div className="alkira-login-tarjeta">
+              <div className="alkira-login-espacio-logo">
+                <img src="/logo-alkira.jpg" alt="Logotipo de ALKIRA" className="alkira-logo-login" />
+              </div>
               <h2>Iniciar sesión</h2>
               <p className="alkira-login-instruccion">Accede a administración o caseta según tu perfil.</p>
 

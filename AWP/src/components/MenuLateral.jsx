@@ -55,7 +55,7 @@ function MenuLateral({ seccionActiva, onCambiarSeccion, onSalir, usuario }) {
 
       <aside className={`alkira-menu-lateral ${abierto ? 'alkira-menu-abierto' : ''}`}>
         <div className="alkira-marca">
-          <span className="alkira-marca-icono"><Icono nombre="edificio" tamano={19} /></span>
+          <img src="/logo-alkira.jpg" alt="Logotipo de ALKIRA" className="alkira-marca-logo" />
           <span><strong>ALKIRA</strong><small>Property OS</small></span>
         </div>
 
