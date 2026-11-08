@@ -1,15 +1,16 @@
 import PaginaPendiente from '../pages/PaginaPendiente.jsx'
 import Mantenimiento from '../modules/modulo6/Mantenimiento.jsx'
 import IndicadoresKdd from '../modules/modulo8/IndicadoresKdd.jsx'
-
 import Propiedades from '../modules/modulo1/Propiedades.jsx'
 import Comprobantes from '../pages/Comprobantes.jsx'
 import Conciliacion from '../modules/modulo4/Conciliacion.jsx'
 import SeguridadQr from '../modules/accesosQr/SeguridadQr.jsx'
 import Incidencias from '../modules/incidencias/Incidencias.jsx'
+import ContratosAdministrativos from '../modules/modulo2/ContratosAdministrativos.jsx'
 
 const PANTALLAS = {
   propiedades: Propiedades,
+  pagos: ContratosAdministrativos,
   mantenimiento: Mantenimiento,
   comprobantes: Comprobantes,
   conciliacion: Conciliacion,
@@ -20,7 +21,14 @@ const PANTALLAS = {
 
 function VistaContenido({ seccion, usuario, onCambiarSeccion }) {
   const Componente = PANTALLAS[seccion.id] ?? PaginaPendiente
-  return <Componente seccion={seccion} usuario={usuario} onCambiarSeccion={onCambiarSeccion} />
+
+  return (
+    <Componente
+      seccion={seccion}
+      usuario={usuario}
+      onCambiarSeccion={onCambiarSeccion}
+    />
+  )
 }
 
 export default VistaContenido
