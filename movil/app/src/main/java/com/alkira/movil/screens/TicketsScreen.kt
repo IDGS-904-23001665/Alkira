@@ -1,3 +1,4 @@
+
 package com.alkira.movil.screens
 
 import androidx.compose.foundation.background
@@ -21,6 +22,7 @@ import com.alkira.movil.red.MovimientoTicket
 import com.alkira.movil.red.TicketMantenimiento
 import com.alkira.movil.red.TicketsApi
 import com.alkira.movil.ui.theme.*
+import kotlinx.coroutines.launch
 import java.io.IOException
 
 private fun nombreEstado(estado: String): String = when (estado) {
@@ -56,6 +58,10 @@ fun TicketsScreen(
     var idSeleccionado by remember { mutableStateOf<Int?>(null) }
     var ticketParaFirmar by remember { mutableStateOf<TicketMantenimiento?>(null) }
     var mensajeConformidad by remember { mutableStateOf<String?>(null) }
+    var mensajeInicio by remember { mutableStateOf<String?>(null) }
+    var errorInicio by remember { mutableStateOf<String?>(null) }
+    var idIniciando by remember { mutableStateOf<Int?>(null) }
+    val alcance = rememberCoroutineScope()
     var movimientos by remember { mutableStateOf<List<MovimientoTicket>>(emptyList()) }
     var cargandoMovimientos by remember { mutableStateOf(false) }
     var errorMovimientos by remember { mutableStateOf<String?>(null) }
@@ -160,6 +166,22 @@ fun TicketsScreen(
             )
         }
 
+        if (mensajeInicio != null) {
+            TarjetaAviso(
+                mensajeInicio.orEmpty(),
+                AlkiraBlueSoft,
+                AlkiraPrimaryBlue
+            )
+        }
+
+        if (errorInicio != null) {
+            TarjetaAviso(
+                errorInicio.orEmpty(),
+                AlkiraRedSoft,
+                AlkiraDangerRed
+            )
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -242,6 +264,55 @@ fun TicketsScreen(
                         if (!ticket.descripcionTrabajo.isNullOrBlank()) {
                             Text("Trabajo: ${ticket.descripcionTrabajo}",
                                 fontSize = 12.sp, color = AlkiraTextSecondary)
+                        }
+
+                        if (ticket.puedeIniciar) {
+                            Button(
+                                onClick = {
+                                    if (idIniciando == null) {
+                                        idIniciando = ticket.idTicket
+                                        mensajeInicio = null
+                                        errorInicio = null
+                                        alcance.launch {
+                                            try {
+                                                mensajeInicio = TicketsApi.iniciarTrabajo(ticket.idTicket)
+                                                numeroConsulta += 1
+                                            } catch (error: ErrorApi) {
+                                                errorInicio = when (error.codigoHttp) {
+                                                    401 -> "Tu sesión venció. Vuelve a iniciar sesión."
+                                                    403 -> "No tienes permiso para iniciar este trabajo."
+                                                    404 -> "Este ticket no está asignado a tu usuario."
+                                                    409 -> error.message ?: "Este ticket ya no puede iniciarse."
+                                                    else -> error.message ?: "No fue posible iniciar el trabajo."
+                                                }
+                                            } catch (_: IOException) {
+                                                errorInicio = "No se pudo conectar con el servidor PHP."
+                                            } catch (_: Exception) {
+                                                errorInicio = "Ocurrió un error al iniciar el trabajo."
+                                            } finally {
+                                                idIniciando = null
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = idIniciando == null && !cargando,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = AlkiraPrimaryBlue
+                                )
+                            ) {
+                                if (idIniciando == ticket.idTicket) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Iniciando trabajo...")
+                                } else {
+                                    Text("Iniciar trabajo")
+                                }
+                            }
                         }
 
                         if (ticket.puedeFirmar) {
