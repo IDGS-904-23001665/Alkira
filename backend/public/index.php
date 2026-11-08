@@ -22,6 +22,8 @@ require_once dirname(__DIR__) . '/controllers/AccesosQrControlador.php';
 require_once dirname(__DIR__) . '/controllers/TicketsControlador.php';
 require_once dirname(__DIR__) . '/controllers/OrdenesTrabajoControlador.php';
 require_once dirname(__DIR__) . '/controllers/CierreMantenimientoControlador.php';
+require_once dirname(__DIR__) . '/controllers/ContratosAdministrativosControlador.php';
+
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -64,6 +66,34 @@ $rutaCierreMantenimiento = is_string($ruta) && (
     || ($metodo === 'POST'
         && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/cerrar$#D', $ruta) === 1)
 );
+
+
+
+$rutaContratosAdministrativos = is_string($ruta) && (
+    ($metodo === 'GET' && (
+        in_array($ruta, [
+            '/api/administracion/contratos',
+            '/api/administracion/contratos/unidades',
+            '/api/administracion/contratos/inquilinos'
+        ], true)
+        || preg_match(
+            '#^/api/administracion/unidades/[1-9][0-9]*/cobros$#D',
+            $ruta
+        ) === 1
+        || preg_match(
+            '#^/api/administracion/contratos/[1-9][0-9]*/documento$#D',
+            $ruta
+        ) === 1
+    ))
+    || ($metodo === 'POST' && (
+        $ruta === '/api/administracion/contratos'
+        || preg_match(
+            '#^/api/administracion/contratos/[1-9][0-9]*/documento$#D',
+            $ruta
+        ) === 1
+    ))
+);
+
 
 $rutaResidentes = $ruta === '/api/incidencias/residentes';
 
@@ -119,7 +149,7 @@ try {
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
 
-    if (!$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
+    if (!$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos  && !$rutaContratosAdministrativos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -153,6 +183,44 @@ try {
     );
 
     $controlador = new AutenticacionControlador($servicio);
+
+if ($rutaContratosAdministrativos) {
+    $usuario = $servicio->verificarTokenWeb(
+        $_COOKIE['alkira_token'] ?? null
+    );
+
+    if ($usuario === null) {
+        http_response_code(401);
+
+        echo json_encode([
+            'mensaje' => 'Sesión administrativa no válida o vencida.'
+        ], JSON_UNESCAPED_UNICODE);
+
+        exit;
+    }
+
+    $repositorioContratos = new ContratosAdministrativosRepositorio(
+        $conexion
+    );
+
+    $servicioContratos = new ContratosAdministrativosServicio(
+        $repositorioContratos,
+        $conexion
+    );
+
+    $controladorContratos = new ContratosAdministrativosControlador(
+        $servicioContratos
+    );
+
+    $controladorContratos->procesar(
+        $metodo,
+        $ruta,
+        $usuario
+    );
+
+    exit;
+}
+
 
     // HU04.2: procesar conciliación sin modificar el preregistro de HU03.2.
     if ($rutaConciliacion) {
