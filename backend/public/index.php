@@ -33,14 +33,21 @@ $rutaHu01 = is_string($ruta) && (
     || $ruta === '/api/usuarios/buscar'
 );
 
+
 $rutaTickets = is_string($ruta) && (
     ($metodo === 'GET' && (
         $ruta === '/api/tickets'
-        || preg_match('#^/api/tickets/[1-9][0-9]*/historial$#D', $ruta) === 1
+        || preg_match(
+            '#^/api/tickets/[1-9][0-9]*/historial$#D',
+            $ruta
+        ) === 1
     ))
-    || ($metodo === 'POST'
-        && preg_match('#^/api/tickets/[1-9][0-9]*/firma$#D', $ruta) === 1)
+    || ($metodo === 'POST' && preg_match(
+        '#^/api/tickets/[1-9][0-9]*/(?:firma|iniciar)$#D',
+        $ruta
+    ) === 1)
 );
+
 
 $rutaOrdenesTrabajo = is_string($ruta) && (
     ($metodo === 'GET' && in_array($ruta, [
