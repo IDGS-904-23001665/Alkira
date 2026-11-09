@@ -1,6 +1,12 @@
 package com.alkira.movil
 
 import android.os.Bundle
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import com.alkira.movil.red.PushAlkira
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -75,9 +81,13 @@ class MainActivity : ComponentActivity() {
                     AplicacionAutenticada(
                         usuario = usuarioAutenticado!!,
                         onCerrarSesion = {
-                            SesionMovil.cerrar()
-                            usuarioAutenticado = null
-                            mensajeError = null
+                            // Quitar el token del dispositivo antes de cerrar la sesión.
+                            alcance.launch {
+                                PushAlkira.salir(applicationContext)
+                                SesionMovil.cerrar()
+                                usuarioAutenticado = null
+                                mensajeError = null
+                            }
                         }
                     )
                 }
@@ -91,6 +101,14 @@ private fun AplicacionAutenticada(
     usuario: UsuarioMovil,
     onCerrarSesion: () -> Unit
 ) {
+    val contexto = LocalContext.current
+    val solicitudPermiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* El centro de avisos sigue disponible aun sin permiso */ }
+    LaunchedEffect(usuario.idUsuario) { PushAlkira.registrar(contexto) }
+    LaunchedEffect(usuario.idUsuario) {
+        if (PushAlkira.configurado() && Build.VERSION.SDK_INT >= 33) {
+            solicitudPermiso.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val estadosHistorias = key(usuario.idUsuario) { rememberSaveableStateHolder() }

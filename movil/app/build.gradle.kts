@@ -12,6 +12,16 @@ android {
         applicationId = if (providers.gradleProperty("alkiraPruebas").orNull == "true")
             "com.alkira.movil.pruebas" else "com.alkira.movil"
         val apiUrl = providers.gradleProperty("alkiraApiUrl").orElse("http://192.168.1.6:8000").get()
+        // Valores públicos de Firebase, guardados por desarrollador fuera de Git.
+        fun configCadena(propiedad: String, nombre: String) {
+            val valor=providers.gradleProperty(propiedad).orElse("").get()
+            buildConfigField("String", nombre, "new String(\"${valor.replace("\\", "\\\\").replace("\"", "\\\"")}\")")
+        }
+        configCadena("alkiraFirebaseProjectId", "FIREBASE_PROJECT_ID")
+        configCadena("alkiraFirebaseApplicationId", "FIREBASE_APP_ID")
+        configCadena("alkiraFirebaseApiKey", "FIREBASE_API_KEY")
+        configCadena("alkiraFirebaseSenderId", "FIREBASE_SENDER_ID")
+
         buildConfigField("String", "API_URL", "new String(\"${apiUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\")")
         minSdk = 26
         targetSdk = 35
@@ -45,6 +55,8 @@ android {
 
 dependencies {
     implementation("com.google.zxing:core:3.5.3")
+    implementation(platform("com.google.firebase:firebase-bom:33.10.0"))
+    implementation("com.google.firebase:firebase-messaging")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

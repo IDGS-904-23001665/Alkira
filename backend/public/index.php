@@ -22,6 +22,7 @@ require_once dirname(__DIR__) . '/controllers/AccesosQrControlador.php';
 require_once dirname(__DIR__) . '/controllers/TicketsControlador.php';
 require_once dirname(__DIR__) . '/controllers/OrdenesTrabajoControlador.php';
 require_once dirname(__DIR__) . '/controllers/CierreMantenimientoControlador.php';
+require_once dirname(__DIR__) . '/controllers/Hu07Controlador.php';
 require_once dirname(__DIR__) . '/controllers/ContratosAdministrativosControlador.php';
 require_once dirname(__DIR__) . '/controllers/ReglasCobroControlador.php';
 require_once dirname(__DIR__) . '/controllers/GeneracionAdeudosControlador.php';
@@ -67,6 +68,14 @@ $rutaCierreMantenimiento = is_string($ruta) && (
         && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/materiales$#D', $ruta) === 1)
     || ($metodo === 'POST'
         && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/cerrar$#D', $ruta) === 1)
+);
+
+$rutaHu07 = is_string($ruta) && (
+    $ruta === '/api/hu07/inmuebles' || $ruta === '/api/hu07/comunicados'
+    || $ruta === '/api/hu07/avisos' || $ruta === '/api/hu07/dispositivos'
+    || $ruta === '/api/hu07/votaciones' || $ruta === '/api/hu07/votaciones-movil'
+    || preg_match('#^/api/hu07/avisos/[1-9][0-9]*/leer$#D', $ruta) === 1
+    || preg_match('#^/api/hu07/votaciones/[1-9][0-9]*/(?:auditoria|votar)$#D', $ruta) === 1
 );
 
 
@@ -188,7 +197,7 @@ try {
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
 
-    if (!$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos  && !$rutaContratosAdministrativos && !$rutaReglasCobro && !$rutaSimulacionAdeudos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
+    if (!$rutaHu07 && !$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos  && !$rutaContratosAdministrativos && !$rutaReglasCobro && !$rutaSimulacionAdeudos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -222,6 +231,18 @@ try {
     );
 
     $controlador = new AutenticacionControlador($servicio);
+
+    // HU07: autenticar cada solicitud con el mecanismo web/movil existente.
+    if ($rutaHu07) {
+        $usuario = AutenticacionSolicitud::usuario($servicio);
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesion no valida o vencida.']);
+            exit;
+        }
+        (new Hu07Controlador(new Hu07Repositorio($conexion), $usuario, $ruta, $metodo))->procesar();
+        exit;
+    }
 
 if ($rutaContratosAdministrativos) {
     $usuario = $servicio->verificarTokenWeb(

@@ -9,6 +9,8 @@ import Comprobantes from '../pages/Comprobantes.jsx'
 import Conciliacion from '../modules/modulo4/Conciliacion.jsx'
 import SeguridadQr from '../modules/accesosQr/SeguridadQr.jsx'
 import Incidencias from '../modules/incidencias/Incidencias.jsx'
+import Comunicados from '../modules/modulo7/Comunicados.jsx'
+import VotacionesAdmin from '../modules/modulo7/VotacionesAdmin.jsx'
 
 import ContratosAdministrativos from '../modules/modulo2/ContratosAdministrativos.jsx'
 import ReglasCobro from '../modules/modulo2/ReglasCobro.jsx'
@@ -82,6 +84,8 @@ const PANTALLAS = {
   seguridad: SeguridadQr,
   incidencias: Incidencias,
   reportes: IndicadoresKdd,
+  comunicados: Comunicados,
+  votaciones: VotacionesAdmin,
 }
 
 function VistaContenido({

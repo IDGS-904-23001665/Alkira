@@ -57,6 +57,20 @@ export const SECCIONES = [
     icono: 'validar',
   },
   {
+    id: 'comunicados',
+    texto: 'Comunicados',
+    titulo: 'Comunicados masivos',
+    descripcion: 'Boletines, envíos y programación para residentes.',
+    icono: 'documento',
+  },
+  {
+    id: 'votaciones',
+    texto: 'Votaciones',
+    titulo: 'Votaciones comunitarias',
+    descripcion: 'Encuestas, resultados porcentuales y auditoría por unidad.',
+    icono: 'validar',
+  },
+  {
     id: 'reportes',
     texto: 'Reportes',
     titulo: 'Analítica',

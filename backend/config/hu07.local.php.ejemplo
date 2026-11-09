@@ -1,0 +1,10 @@
+<?php
+// Copiar como hu07.local.php (ignorando por .gitignore). NO subir claves a GitHub.
+return [
+    // Requiere que PHP mail() esté configurado con SMTP/sendmail funcional.
+    'habilitarCorreo' => false,
+    'correoDesde' => 'avisos@tu-dominio.example',
+    // FCM v1: descargar credencial de service account y guardarla fuera de htdocs.
+    'cuentaServicioFcm' => '', // p.ej. C:/alkira-privado/firebase-service-account.json
+    'proyectoFcm' => '', // Firebase project ID, sin secretos aquí
+];

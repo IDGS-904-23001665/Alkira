@@ -1,0 +1,21 @@
+<?php
+// Copiar a: backend/config/hu07.local.php. El archivo destino esta ignorado por Git.
+// TODO ESTA DESACTIVADO hasta que lo configures expresamente.
+return [
+    'habilitarCorreo' => false,
+    'proveedorCorreo' => 'brevo',
+    'correoDesde' => 'remitente-verificado@ejemplo.com',
+    'brevoApiKey' => '', // Clave privada de API de Brevo, NO se sube al repositorio.
+
+    // Firebase Cloud Messaging HTTP v1. JSON de cuenta de servicio FUERA de htdocs.
+    'proyectoFcm' => '',
+    'cuentaServicioFcm' => '', // Ej.: C:/xampp/alkira-privado/firebase-service-account.json
+
+    // Proteccion contra envios masivos accidentales:
+    // Indica el ID REAL de un usuario de prueba de MySQL. 0 bloquea todos los envios.
+    'idUsuarioPrueba' => 0,
+    // Bloquea reenvíos de avisos antiguos. Indica el ID del siguiente comunicado nuevo.
+    'idComunicadoDesde' => 0, // 0 = entregas externas BLOQUEADAS.
+    // Solo activar tras revisar con el equipo destinatarios y consentimiento.
+    'permitirEnvioMasivo' => false,
+];
