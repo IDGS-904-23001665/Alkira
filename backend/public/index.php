@@ -23,6 +23,8 @@ require_once dirname(__DIR__) . '/controllers/TicketsControlador.php';
 require_once dirname(__DIR__) . '/controllers/OrdenesTrabajoControlador.php';
 require_once dirname(__DIR__) . '/controllers/CierreMantenimientoControlador.php';
 require_once dirname(__DIR__) . '/controllers/ContratosAdministrativosControlador.php';
+require_once dirname(__DIR__) . '/controllers/ReglasCobroControlador.php';
+require_once dirname(__DIR__) . '/controllers/GeneracionAdeudosControlador.php';
 
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
@@ -95,6 +97,43 @@ $rutaContratosAdministrativos = is_string($ruta) && (
 );
 
 
+$rutaReglasCobro = is_string($ruta) && (
+    (
+        $metodo === 'GET'
+        && (
+            in_array(
+                $ruta,
+                [
+                    '/api/administracion/reglas-cobro',
+                    '/api/administracion/reglas-cobro/conceptos'
+                ],
+                true
+            )
+            || preg_match(
+                '#^/api/administracion/reglas-cobro/[1-9][0-9]*$#D',
+                $ruta
+            ) === 1
+        )
+    )
+    || (
+        $metodo === 'POST'
+        && $ruta === '/api/administracion/reglas-cobro'
+    )
+    || (
+        $metodo === 'PUT'
+        && preg_match(
+            '#^/api/administracion/reglas-cobro/[1-9][0-9]*$#D',
+            $ruta
+        ) === 1
+    )
+);
+
+$rutaSimulacionAdeudos = is_string($ruta)
+    && $metodo === 'GET'
+    && $ruta === '/api/administracion/adeudos/simulacion';
+
+
+
 $rutaResidentes = $ruta === '/api/incidencias/residentes';
 
 // HU04.2: rutas adicionales de conciliación de pagos.
@@ -149,7 +188,7 @@ try {
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
 
-    if (!$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos  && !$rutaContratosAdministrativos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
+    if (!$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos  && !$rutaContratosAdministrativos && !$rutaReglasCobro && !$rutaSimulacionAdeudos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -220,6 +259,85 @@ if ($rutaContratosAdministrativos) {
 
     exit;
 }
+
+
+if ($rutaReglasCobro) {
+    $usuario = $servicio->verificarTokenWeb(
+        $_COOKIE['alkira_token'] ?? null
+    );
+
+    if ($usuario === null) {
+        http_response_code(401);
+
+        echo json_encode([
+            'mensaje' => 'Sesión administrativa no válida o vencida.'
+        ], JSON_UNESCAPED_UNICODE);
+
+        exit;
+    }
+
+    $repositorioReglas = new ReglasCobroRepositorio(
+        $conexion
+    );
+
+    $servicioReglas = new ReglasCobroServicio(
+        $repositorioReglas
+    );
+
+    $controladorReglas = new ReglasCobroControlador(
+        $servicioReglas
+    );
+
+    $controladorReglas->procesar(
+        $metodo,
+        $ruta,
+        $usuario
+    );
+
+    exit;
+}
+
+
+if ($rutaSimulacionAdeudos) {
+    // Validar la sesión administrativa existente.
+    $usuario = $servicio->verificarTokenWeb(
+        $_COOKIE['alkira_token'] ?? null
+    );
+
+    if ($usuario === null) {
+        http_response_code(401);
+
+        echo json_encode([
+            'mensaje' => 'Sesión administrativa no válida o vencida.'
+        ], JSON_UNESCAPED_UNICODE);
+
+        exit;
+    }
+
+    // Construir las capas del Módulo 02.
+    $repositorioGeneracion = new GeneracionAdeudosRepositorio(
+        $conexion
+    );
+
+    $servicioGeneracion = new GeneracionAdeudosServicio(
+        $repositorioGeneracion
+    );
+
+    $controladorGeneracion = new GeneracionAdeudosControlador(
+        $servicioGeneracion
+    );
+
+    // El controlador verifica el rol del administrador.
+    $controladorGeneracion->procesar(
+        $metodo,
+        $ruta,
+        $usuario
+    );
+
+    exit;
+}
+
+
 
 
     // HU04.2: procesar conciliación sin modificar el preregistro de HU03.2.
