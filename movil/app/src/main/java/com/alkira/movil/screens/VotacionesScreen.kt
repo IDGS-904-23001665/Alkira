@@ -1,439 +1,167 @@
 package com.alkira.movil.screens
 
+import android.text.Html
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.HowToVote
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import com.alkira.movil.red.*
 import com.alkira.movil.ui.theme.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 
+/** HU07.1 + HU07.2. Reemplaza la antigua pantalla con cifras simuladas. */
 @Composable
-fun VotacionesScreen(
-    modifier: Modifier = Modifier,
-    onNavigateBack: () -> Unit = {}
-) {
-    var selectedTower by remember { mutableStateOf("Todas las Torres") }
-    var selectedOptionIndex by remember { mutableStateOf(0) }
-    var hasVoted by remember { mutableStateOf(false) }
-    var showConfirmModal by remember { mutableStateOf(false) }
-    var showNewNoticeModal by remember { mutableStateOf(false) }
+fun VotacionesScreen(modifier: Modifier=Modifier, onNavigateBack: () -> Unit={}) {
+    var pestana by remember { mutableIntStateOf(0) }
+    var avisos by remember { mutableStateOf<List<AvisoComunidad>>(emptyList()) }
+    var votaciones by remember { mutableStateOf<List<EncuestaComunidad>>(emptyList()) }
+    var cargando by remember { mutableStateOf(true) }
+    var guardando by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var mensaje by remember { mutableStateOf<String?>(null) }
+    var confirmar by remember { mutableStateOf<Triple<Int,Int,Int>?>(null) }
+    val scope=rememberCoroutineScope()
 
-    // Estados de votos en tiempo real
-    var votesOptionA by remember { mutableStateOf(34) }
-    var votesOptionB by remember { mutableStateOf(16) }
-    val totalVotes = votesOptionA + votesOptionB
-    val percentA = if (totalVotes > 0) (votesOptionA.toFloat() / totalVotes) else 0f
-    val percentB = if (totalVotes > 0) (votesOptionB.toFloat() / totalVotes) else 0f
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(AlkiraCanvasBg)
-            .padding(horizontal = 20.dp, vertical = 16.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Encabezado
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Avisos y Votaciones",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlkiraTextPrimary
-                )
-                Text(
-                    text = "Asamblea Virtual en Vivo",
-                    fontSize = 12.sp,
-                    color = AlkiraTextSecondary
-                )
-            }
-
-            // Pill tiempo restante
-            Surface(
-                color = AlkiraBlueSoft,
-                shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, AlkiraPrimaryBlue.copy(alpha = 0.3f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.size(6.dp).background(AlkiraPrimaryBlue, CircleShape))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Activa: 48h",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AlkiraBlueBadgeText
-                    )
-                }
-            }
-        }
-
-        // Segmentador por Torre / Bloque
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AlkiraSurfaceWhite, RoundedCornerShape(10.dp))
-                .border(1.dp, AlkiraBorderSubtle, RoundedCornerShape(10.dp))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            listOf("Todas las Torres", "Torre A", "Torre B").forEach { tower ->
-                val isSelected = selectedTower == tower
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            if (isSelected) AlkiraDarkNavy else Color.Transparent,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { selectedTower = tower }
-                        .padding(vertical = 7.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = tower,
-                        fontSize = 11.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.White else AlkiraTextSecondary
-                    )
-                }
-            }
-        }
-
-        // Card 1: Comunicado Destacado
-        Card(
-            colors = CardDefaults.cardColors(containerColor = AlkiraSurfaceWhite),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, AlkiraBorderSubtle, RoundedCornerShape(14.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        color = AlkiraGreenSoft,
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = "Aviso Oficial • Administración",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AlkiraGreenText,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                    Text(
-                        text = "Hoy, 10:30 AM",
-                        fontSize = 11.sp,
-                        color = AlkiraTextSecondary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Mantenimiento General e Instalación de Luminarias LED",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlkiraTextPrimary
-                )
-                Text(
-                    text = "Estimados condóminos de $selectedTower: Se somete a consulta comunitaria la sustitución total de iluminación exterior para optimizar costos de consumo eléctrico en áreas comunes.",
-                    fontSize = 12.sp,
-                    color = AlkiraTextSecondary,
-                    modifier = Modifier.padding(top = 6.dp)
-                )
-            }
-        }
-
-        // Card 2: Votación Comunitaria en Vivo
-        Card(
-            colors = CardDefaults.cardColors(containerColor = AlkiraSurfaceWhite),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, AlkiraBorderSubtle, RoundedCornerShape(14.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Votación en Curso",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AlkiraPrimaryBlue
-                )
-                Text(
-                    text = "¿Aprueba la inversión de $45,000 MXN para luminarias solares LED?",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlkiraTextPrimary,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Opción A
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(if (selectedOptionIndex == 0) AlkiraBlueSoft else AlkiraCanvasBg, RoundedCornerShape(8.dp))
-                        .border(
-                            1.dp,
-                            if (selectedOptionIndex == 0) AlkiraPrimaryBlue else AlkiraBorderSubtle,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable(enabled = !hasVoted) { selectedOptionIndex = 0 }
-                        .padding(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Opción A: Sí, aprobar proyecto",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AlkiraTextPrimary
-                        )
-                        Text(
-                            text = "${(percentA * 100).toInt()}% ($votesOptionA votos)",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AlkiraPrimaryBlue
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    LinearProgressIndicator(
-                        progress = { percentA },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp),
-                        color = AlkiraPrimaryBlue,
-                        trackColor = AlkiraBorderSubtle
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Opción B
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(if (selectedOptionIndex == 1) AlkiraBlueSoft else AlkiraCanvasBg, RoundedCornerShape(8.dp))
-                        .border(
-                            1.dp,
-                            if (selectedOptionIndex == 1) AlkiraPrimaryBlue else AlkiraBorderSubtle,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable(enabled = !hasVoted) { selectedOptionIndex = 1 }
-                        .padding(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Opción B: Solicitar más cotizaciones",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AlkiraTextPrimary
-                        )
-                        Text(
-                            text = "${(percentB * 100).toInt()}% ($votesOptionB votos)",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AlkiraTextSecondary
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    LinearProgressIndicator(
-                        progress = { percentB },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp),
-                        color = AlkiraTextSecondary,
-                        trackColor = AlkiraBorderSubtle
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Botón de emitir voto
-                if (!hasVoted) {
-                    Button(
-                        onClick = { showConfirmModal = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AlkiraPrimaryBlue)
-                    ) {
-                        Text("Confirmar Voto", fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                } else {
-                    Surface(
-                        color = AlkiraGreenSoft,
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "✓ Tu voto ha sido registrado y encriptado en el quórum.",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AlkiraGreenText,
-                            modifier = Modifier.padding(10.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Acciones administrativas de apoyo
-        OutlinedButton(
-            onClick = { showNewNoticeModal = true },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, AlkiraBorderStrong)
-        ) {
-            Text("+ Redactar Nuevo Comunicado Push", color = AlkiraDarkNavy, fontWeight = FontWeight.SemiBold)
-        }
+    suspend fun actualizar(silencioso:Boolean=false){
+        if(!silencioso)cargando=true
+        try {
+            avisos=ComunidadApi.avisos();votaciones=ComunidadApi.votaciones();error=null
+        }catch(e:CancellationException){throw e}
+        catch(e:Exception){if(!silencioso)error=e.message?:"No se pudieron cargar los avisos."}
+        finally{cargando=false}
     }
+    LaunchedEffect(Unit) { actualizar() }
+    // Los resultados se consultan periódicamente; el servidor es la autoridad.
+    LaunchedEffect(pestana) { while (isActive) { delay(10_000); actualizar(true) } }
 
-    // ==========================================
-    // SUBVENTANA 1: Modal de Confirmación de Voto
-    // ==========================================
-    if (showConfirmModal) {
-        Dialog(onDismissRequest = { showConfirmModal = false }) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = AlkiraSurfaceWhite,
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(
-                        text = "Confirmar Emisión de Voto",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AlkiraTextPrimary
-                    )
-                    Text(
-                        text = "Has seleccionado: ${if (selectedOptionIndex == 0) "Opción A (Aprobar proyecto)" else "Opción B (Solicitar cotizaciones)"}.",
-                        fontSize = 13.sp,
-                        color = AlkiraTextSecondary,
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { showConfirmModal = false }) {
-                            Text("Modificar", color = AlkiraTextSecondary)
+    Column(modifier.fillMaxSize().background(AlkiraCanvasBg).padding(18.dp)) {
+        Text("Comunidad",fontSize=22.sp,fontWeight=FontWeight.Bold,color=AlkiraTextPrimary)
+        Text("Avisos y votaciones de tu condominio",fontSize=12.sp,color=AlkiraTextSecondary)
+        Spacer(Modifier.height(16.dp))
+        TabRow(selectedTabIndex=pestana,containerColor=Color.White,contentColor=AlkiraPrimaryBlue){
+            Tab(selected=pestana==0,onClick={pestana=0},text={Text("Centro de avisos")},icon={Icon(Icons.Outlined.Notifications,null)})
+            Tab(selected=pestana==1,onClick={pestana=1},text={Text("Votaciones")},icon={Icon(Icons.Outlined.HowToVote,null)})
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
+            val n=avisos.count{!it.leido}
+            Text(if(pestana==0)"${n} sin leer" else "Un voto por unidad",fontSize=12.sp,color=AlkiraTextSecondary)
+            TextButton(onClick={scope.launch{actualizar()}},enabled=!cargando){Text("Actualizar",color=AlkiraPrimaryBlue)}
+        }
+        if(cargando)LinearProgressIndicator(Modifier.fillMaxWidth(),color=AlkiraPrimaryBlue)
+        error?.let { Text(it,color=AlkiraDangerRed,fontSize=13.sp) }
+        mensaje?.let { Text(it,color=AlkiraSuccessGreen,fontSize=13.sp) }
+        Spacer(Modifier.height(8.dp))
+        if(pestana==0) {
+            LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                if(!cargando&&avisos.isEmpty())item { Text("Aún no hay boletines para tu unidad.",color=AlkiraTextSecondary) }
+                items(avisos,key={it.id}) { aviso ->
+                    Card(shape=RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=Color.White),
+                        modifier=Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.Top){
+                                Text(aviso.titulo,Modifier.weight(1f),fontWeight=FontWeight.Bold,color=AlkiraTextPrimary)
+                                if(!aviso.leido) Surface(color=AlkiraBlueSoft,shape=RoundedCornerShape(15.dp)) {
+                                    Text("Nuevo",Modifier.padding(horizontal=9.dp,vertical=4.dp),fontSize=11.sp,color=AlkiraPrimaryBlue)
+                                }
+                            }
+                            Text("${aviso.inmueble} · ${aviso.fecha}",fontSize=11.sp,color=AlkiraTextSecondary)
+                            Text(Html.fromHtml(aviso.contenido,Html.FROM_HTML_MODE_COMPACT).toString().trim(),fontSize=13.sp,color=AlkiraTextPrimary)
+                            if(!aviso.leido) TextButton(onClick={scope.launch {
+                                try{ComunidadApi.marcarLeido(aviso.id);mensaje="Aviso marcado como leído.";actualizar(true)}
+                                catch(e:Exception){error=e.message}
+                            }},contentPadding=PaddingValues(0.dp)){Text("Marcar como leído",color=AlkiraPrimaryBlue)}
+                            else Text("✓ Leído",fontSize=11.sp,color=AlkiraSuccessGreen)
                         }
-                        Button(
-                            onClick = {
-                                if (selectedOptionIndex == 0) votesOptionA++ else votesOptionB++
-                                hasVoted = true
-                                showConfirmModal = false
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = AlkiraPrimaryBlue)
-                        ) {
-                            Text("Confirmar")
+                    }
+                }
+            }
+        }else {
+            LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                if(!cargando&&votaciones.isEmpty())item { Text("No hay votaciones disponibles para tu unidad.",color=AlkiraTextSecondary) }
+                items(votaciones,key={it.id}){ v ->
+                    var unidad by remember(v.id,v.unidades) { mutableIntStateOf(v.unidades.firstOrNull()?.id?:0) }
+                    var opcion by remember(v.id) { mutableIntStateOf(0) }
+                    val ahora=LocalDateTime.now()
+                    val abierta=try {v.estado=="activa"&&
+                        !ahora.isBefore(LocalDateTime.parse(v.inicio.replace(' ','T')))&&
+                        ahora.isBefore(LocalDateTime.parse(v.cierre.replace(' ','T')))}catch(_:Exception){false}
+                    val votoExistente=v.misVotos[unidad]
+                    Card(shape=RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                            Text(v.titulo,fontWeight=FontWeight.Bold,fontSize=16.sp,color=AlkiraTextPrimary)
+                            if(v.descripcion.isNotBlank())Text(v.descripcion,fontSize=13.sp,color=AlkiraTextSecondary)
+                            Text("${v.inmueble} · ${if(abierta)"Abierta" else "Fuera del periodo"}",fontSize=12.sp,color=if(abierta)AlkiraSuccessGreen else AlkiraTextSecondary)
+                            Text("Inicio: ${v.inicio} · Cierre: ${v.cierre}",fontSize=11.sp,color=AlkiraTextSecondary)
+                            if(v.unidades.size>1){
+                                var desplegado by remember { mutableStateOf(false) }
+                                Box {
+                                    OutlinedButton(onClick={desplegado=true}) {
+                                        Text(v.unidades.find{it.id==unidad}?.etiqueta?:"Selecciona unidad")
+                                    }
+                                    DropdownMenu(expanded=desplegado,onDismissRequest={desplegado=false}){
+                                        v.unidades.forEach { u->DropdownMenuItem(text={Text(u.etiqueta)},onClick={unidad=u.id;opcion=0;desplegado=false}) }
+                                    }
+                                }
+                            }else Text("Unidad: ${v.unidades.firstOrNull()?.etiqueta.orEmpty()}",fontSize=12.sp,color=AlkiraTextSecondary)
+                            if(votoExistente!=null)Text("✓ Tu unidad ya emitió su voto.",color=AlkiraSuccessGreen,fontWeight=FontWeight.Bold)
+                            v.opciones.forEach { o ->
+                                val seleccionado=opcion==o.id
+                                Surface(color=if(seleccionado)AlkiraBlueSoft else AlkiraCanvasBg,
+                                    shape=RoundedCornerShape(10.dp),modifier=Modifier.fillMaxWidth()
+                                    .clickable(enabled=abierta&&votoExistente==null&&!guardando){opcion=o.id}) {
+                                    Row(Modifier.padding(11.dp),verticalAlignment=Alignment.CenterVertically) {
+                                        RadioButton(selected=seleccionado,onClick={opcion=o.id},enabled=abierta&&votoExistente==null&&!guardando)
+                                        Text(o.texto,color=AlkiraTextPrimary,fontSize=13.sp)
+                                    }
+                                }
+                            }
+                            if(abierta&&votoExistente==null)Button(onClick={confirmar=Triple(v.id,unidad,opcion)},
+                                enabled=opcion>0&&!guardando,colors=ButtonDefaults.buttonColors(containerColor=AlkiraPrimaryBlue)) {
+                                Text("Confirmar mi voto")
+                            }
+                            Text("Resultados · ${v.total} unidades han participado",fontSize=12.sp,fontWeight=FontWeight.SemiBold,color=AlkiraTextSecondary)
+                            v.opciones.forEach { o ->
+                                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
+                                    Text(o.texto,fontSize=12.sp,color=AlkiraTextPrimary)
+                                    Text("${o.porcentaje}% (${o.votos})",fontSize=12.sp,color=AlkiraTextSecondary)
+                                }
+                                LinearProgressIndicator(progress={ (o.porcentaje/100.0).toFloat().coerceIn(0f,1f) },
+                                    modifier=Modifier.fillMaxWidth().height(7.dp),color=AlkiraPrimaryBlue,trackColor=AlkiraBorderSubtle)
+                            }
                         }
                     }
                 }
             }
         }
     }
-
-    // ==========================================
-    // SUBVENTANA 2: Modal de Nuevo Comunicado
-    // ==========================================
-    if (showNewNoticeModal) {
-        var noticeTitle by remember { mutableStateOf("") }
-        var noticeBody by remember { mutableStateOf("") }
-
-        Dialog(onDismissRequest = { showNewNoticeModal = false }) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = AlkiraSurfaceWhite,
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(
-                        text = "Nuevo Comunicado Push",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AlkiraTextPrimary
-                    )
-                    Text(
-                        text = "Segmentación para $selectedTower",
-                        fontSize = 12.sp,
-                        color = AlkiraTextSecondary,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = noticeTitle,
-                        onValueChange = { noticeTitle = it },
-                        label = { Text("Título del aviso") },
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = noticeBody,
-                        onValueChange = { noticeBody = it },
-                        label = { Text("Cuerpo del comunicado") },
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { showNewNoticeModal = false }) {
-                            Text("Descartar", color = AlkiraTextSecondary)
-                        }
-                        Button(
-                            onClick = { showNewNoticeModal = false },
-                            colors = ButtonDefaults.buttonColors(containerColor = AlkiraDarkNavy)
-                        ) {
-                            Text("Enviar Notificación")
-                        }
-                    }
+    confirmar?.let { (id,unidad,opcion) ->
+        AlertDialog(onDismissRequest={if(!guardando)confirmar=null},title={Text("Confirmar voto")},
+            text={Text("Tu unidad solo puede votar una vez en esta encuesta. Esta decisión no se puede cambiar. ¿Deseas continuar?")},
+            confirmButton={TextButton(enabled=!guardando,onClick={
+                guardando=true;scope.launch {
+                    try{ComunidadApi.votar(id,unidad,opcion);mensaje="¡Voto registrado correctamente!";error=null;actualizar(true)}
+                    catch(e:Exception){error=e.message?:"No se pudo registrar el voto."}
+                    finally{guardando=false;confirmar=null}
                 }
-            }
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun VotacionesScreenPreview() {
-    PantallasMovilTheme {
-        VotacionesScreen()
+            }){Text("Sí, emitir voto")}},
+            dismissButton={TextButton(enabled=!guardando,onClick={confirmar=null}){Text("Cancelar")}})
     }
 }
