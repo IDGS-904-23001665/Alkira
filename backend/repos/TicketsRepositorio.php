@@ -84,6 +84,163 @@ final class TicketsRepositorio
         return $consulta->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function iniciarTrabajo(int $idTicket, int $idTecnico): void
+    {
+        $this->conexion->beginTransaction();
+
+        try {
+            // Bloquear el ticket para evitar cambios simultáneos.
+            $consulta = $this->conexion->prepare(
+                'SELECT estado, id_incidencia AS idIncidencia
+                 FROM tickets_mantenimiento
+                 WHERE id_ticket = :idTicket
+                 FOR UPDATE'
+            );
+            $consulta->execute(['idTicket' => $idTicket]);
+            $ticket = $consulta->fetch(PDO::FETCH_ASSOC);
+
+            if ($ticket === false) {
+                throw new OutOfBoundsException('El ticket no existe.');
+            }
+
+            if ($ticket['estado'] !== 'asignado') {
+                throw new DomainException(
+                    'Solo se puede iniciar un ticket asignado.'
+                );
+            }
+
+            // Comprobar la asignación más reciente.
+            $consulta = $this->conexion->prepare(
+                'SELECT id_asignacion AS idAsignacion,
+                        id_tecnico AS idTecnico,
+                        estado
+                 FROM asignacion_ordenes_trabajo
+                 WHERE id_ticket = :idTicket
+                 ORDER BY id_asignacion DESC
+                 LIMIT 1
+                 FOR UPDATE'
+            );
+            $consulta->execute(['idTicket' => $idTicket]);
+            $orden = $consulta->fetch(PDO::FETCH_ASSOC);
+
+            if ($orden === false) {
+                throw new DomainException(
+                    'El ticket no tiene una orden de trabajo.'
+                );
+            }
+
+            if ((int) $orden['idTecnico'] !== $idTecnico) {
+                throw new DomainException(
+                    'Esta orden está asignada a otro técnico.'
+                );
+            }
+
+            if (!in_array(
+                $orden['estado'],
+                ['asignada', 'aceptada'],
+                true
+            )) {
+                throw new DomainException(
+                    'La orden ya no puede iniciarse.'
+                );
+            }
+
+            // Sincronizar también la incidencia vinculada.
+            $consulta = $this->conexion->prepare(
+                'SELECT estado FROM incidencias
+                 WHERE id_incidencia = :idIncidencia
+                 FOR UPDATE'
+            );
+            $consulta->execute([
+                'idIncidencia' => $ticket['idIncidencia']
+            ]);
+
+            $estadoIncidencia = $consulta->fetchColumn();
+
+            if ($estadoIncidencia === false) {
+                throw new RuntimeException(
+                    'No se encontró la incidencia del ticket.'
+                );
+            }
+
+            if (!in_array(
+                $estadoIncidencia,
+                ['reportada', 'en_revision', 'asignada', 'en_proceso'],
+                true
+            )) {
+                throw new DomainException(
+                    'La incidencia ya no admite iniciar trabajos.'
+                );
+            }
+
+            // Actualizar la orden del técnico.
+            $consulta = $this->conexion->prepare(
+                "UPDATE asignacion_ordenes_trabajo
+                 SET estado = 'en_proceso'
+                 WHERE id_asignacion = :idAsignacion
+                   AND id_tecnico = :idTecnico
+                   AND estado IN ('asignada', 'aceptada')"
+            );
+
+            $consulta->execute([
+                'idAsignacion' => $orden['idAsignacion'],
+                'idTecnico' => $idTecnico
+            ]);
+
+            if ($consulta->rowCount() !== 1) {
+                throw new RuntimeException(
+                    'No fue posible iniciar la orden de trabajo.'
+                );
+            }
+
+            // Actualizar el estado del ticket.
+            $consulta = $this->conexion->prepare(
+                "UPDATE tickets_mantenimiento
+                 SET estado = 'en_proceso'
+                 WHERE id_ticket = :idTicket
+                   AND estado = 'asignado'"
+            );
+
+            $consulta->execute(['idTicket' => $idTicket]);
+
+            if ($consulta->rowCount() !== 1) {
+                throw new RuntimeException(
+                    'No fue posible actualizar el ticket.'
+                );
+            }
+
+            // Actualizar la incidencia si todavía no está en proceso.
+            if ($estadoIncidencia !== 'en_proceso') {
+                $consulta = $this->conexion->prepare(
+                    "UPDATE incidencias
+                     SET estado = 'en_proceso'
+                     WHERE id_incidencia = :idIncidencia
+                       AND estado IN ('reportada', 'en_revision', 'asignada')"
+                );
+
+                $consulta->execute([
+                    'idIncidencia' => $ticket['idIncidencia']
+                ]);
+
+                if ($consulta->rowCount() !== 1) {
+                    throw new RuntimeException(
+                        'No fue posible actualizar la incidencia.'
+                    );
+                }
+            }
+
+            // El trigger de MySQL registra el cambio del ticket.
+            $this->conexion->commit();
+
+        } catch (Throwable $error) {
+            if ($this->conexion->inTransaction()) {
+                $this->conexion->rollBack();
+            }
+
+            throw $error;
+        }
+    }
+
     public function registrarConformidad(
         int $idTicket,
         int $idUsuario,
@@ -92,7 +249,9 @@ final class TicketsRepositorio
     ): void {
         $directorio = dirname(__DIR__) . '/documentos/firmas';
         $rutaAbsoluta = null;
+
         $this->conexion->beginTransaction();
+
         try {
             $consulta = $this->conexion->prepare(
                 'SELECT t.estado
@@ -102,31 +261,67 @@ final class TicketsRepositorio
                    AND i.id_usuario_reporta = :idUsuario
                  FOR UPDATE'
             );
-            $consulta->execute(['idTicket' => $idTicket, 'idUsuario' => $idUsuario]);
+
+            $consulta->execute([
+                'idTicket' => $idTicket,
+                'idUsuario' => $idUsuario
+            ]);
+
             $ticket = $consulta->fetch(PDO::FETCH_ASSOC);
+
             if ($ticket === false) {
-                throw new OutOfBoundsException('No se encontró un ticket que puedas firmar.');
+                throw new OutOfBoundsException(
+                    'No se encontró un ticket que puedas firmar.'
+                );
             }
+
             if ($ticket['estado'] !== 'en_proceso') {
-                throw new DomainException('Solo puedes firmar un ticket en proceso.');
+                throw new DomainException(
+                    'Solo puedes firmar un ticket en proceso.'
+                );
             }
 
             $consulta = $this->conexion->prepare(
-                'SELECT id_firma FROM firmas_conformidad WHERE id_ticket = :idTicket LIMIT 1'
+                'SELECT id_firma FROM firmas_conformidad
+                 WHERE id_ticket = :idTicket LIMIT 1'
             );
+
             $consulta->execute(['idTicket' => $idTicket]);
+
             if ($consulta->fetchColumn() !== false) {
-                throw new DomainException('Este ticket ya tiene una firma de conformidad.');
+                throw new DomainException(
+                    'Este ticket ya tiene una firma de conformidad.'
+                );
             }
 
-            if (!is_dir($directorio) && !mkdir($directorio, 0700, true) && !is_dir($directorio)) {
-                throw new RuntimeException('No fue posible preparar el almacenamiento privado.');
+            if (
+                !is_dir($directorio)
+                && !mkdir($directorio, 0700, true)
+                && !is_dir($directorio)
+            ) {
+                throw new RuntimeException(
+                    'No fue posible preparar el almacenamiento privado.'
+                );
             }
-            $nombreArchivo = 'firma-ticket-' . $idTicket . '-' . bin2hex(random_bytes(16)) . '.png';
+
+            $nombreArchivo = 'firma-ticket-'
+                . $idTicket . '-'
+                . bin2hex(random_bytes(16)) . '.png';
+
             $rutaAbsoluta = $directorio . '/' . $nombreArchivo;
-            if (file_put_contents($rutaAbsoluta, $imagenPng, LOCK_EX) !== strlen($imagenPng)) {
-                throw new RuntimeException('No se pudo guardar la firma digital.');
+
+            if (
+                file_put_contents(
+                    $rutaAbsoluta,
+                    $imagenPng,
+                    LOCK_EX
+                ) !== strlen($imagenPng)
+            ) {
+                throw new RuntimeException(
+                    'No se pudo guardar la firma digital.'
+                );
             }
+
             chmod($rutaAbsoluta, 0600);
 
             $consulta = $this->conexion->prepare(
@@ -134,6 +329,7 @@ final class TicketsRepositorio
                     (id_ticket, id_usuario_residente, ruta_firma, comentario)
                  VALUES (:idTicket, :idUsuario, :rutaFirma, :comentario)'
             );
+
             $consulta->execute([
                 'idTicket' => $idTicket,
                 'idUsuario' => $idUsuario,
@@ -142,23 +338,35 @@ final class TicketsRepositorio
             ]);
 
             $consulta = $this->conexion->prepare(
-                "UPDATE tickets_mantenimiento SET estado = 'pendiente_revision'
-                 WHERE id_ticket = :idTicket AND estado = 'en_proceso'"
+                "UPDATE tickets_mantenimiento
+                 SET estado = 'pendiente_revision'
+                 WHERE id_ticket = :idTicket
+                   AND estado = 'en_proceso'"
             );
+
             $consulta->execute(['idTicket' => $idTicket]);
+
             if ($consulta->rowCount() !== 1) {
-                throw new RuntimeException('No se pudo cambiar el estado del ticket.');
+                throw new RuntimeException(
+                    'No se pudo cambiar el estado del ticket.'
+                );
             }
+
             $this->conexion->commit();
+
         } catch (Throwable $error) {
             if ($this->conexion->inTransaction()) {
                 $this->conexion->rollBack();
             }
-            if ($rutaAbsoluta !== null && is_file($rutaAbsoluta)) {
+
+            if (
+                $rutaAbsoluta !== null
+                && is_file($rutaAbsoluta)
+            ) {
                 unlink($rutaAbsoluta);
             }
+
             throw $error;
         }
     }
-
 }

@@ -9,6 +9,8 @@ require_once dirname(__DIR__) . '/config/Conexion.php';
 require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
 require_once dirname(__DIR__) . '/controllers/KddControlador.php';
 require_once dirname(__DIR__) . '/repos/ComprobantesRepositorio.php';
+require_once dirname(__DIR__) . '/repos/ConciliacionRepositorio.php';
+require_once dirname(__DIR__) . '/controllers/ConciliacionControlador.php';
 require_once dirname(__DIR__) . '/controllers/ComprobantesMovilControlador.php';
 require_once dirname(__DIR__) . '/controllers/InmueblesControlador.php';
 require_once dirname(__DIR__) . '/controllers/AdeudosControlador.php';
@@ -21,6 +23,10 @@ require_once dirname(__DIR__) . '/controllers/TicketsControlador.php';
 require_once dirname(__DIR__) . '/controllers/OrdenesTrabajoControlador.php';
 require_once dirname(__DIR__) . '/controllers/CierreMantenimientoControlador.php';
 require_once dirname(__DIR__) . '/controllers/Hu07Controlador.php';
+require_once dirname(__DIR__) . '/controllers/ContratosAdministrativosControlador.php';
+require_once dirname(__DIR__) . '/controllers/ReglasCobroControlador.php';
+require_once dirname(__DIR__) . '/controllers/GeneracionAdeudosControlador.php';
+
 
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -32,14 +38,21 @@ $rutaHu01 = is_string($ruta) && (
     || $ruta === '/api/usuarios/buscar'
 );
 
+
 $rutaTickets = is_string($ruta) && (
     ($metodo === 'GET' && (
         $ruta === '/api/tickets'
-        || preg_match('#^/api/tickets/[1-9][0-9]*/historial$#D', $ruta) === 1
+        || preg_match(
+            '#^/api/tickets/[1-9][0-9]*/historial$#D',
+            $ruta
+        ) === 1
     ))
-    || ($metodo === 'POST'
-        && preg_match('#^/api/tickets/[1-9][0-9]*/firma$#D', $ruta) === 1)
+    || ($metodo === 'POST' && preg_match(
+        '#^/api/tickets/[1-9][0-9]*/(?:firma|iniciar)$#D',
+        $ruta
+    ) === 1)
 );
+
 
 $rutaOrdenesTrabajo = is_string($ruta) && (
     ($metodo === 'GET' && in_array($ruta, [
@@ -65,7 +78,76 @@ $rutaHu07 = is_string($ruta) && (
     || preg_match('#^/api/hu07/votaciones/[1-9][0-9]*/(?:auditoria|votar)$#D', $ruta) === 1
 );
 
+
+
+$rutaContratosAdministrativos = is_string($ruta) && (
+    ($metodo === 'GET' && (
+        in_array($ruta, [
+            '/api/administracion/contratos',
+            '/api/administracion/contratos/unidades',
+            '/api/administracion/contratos/inquilinos'
+        ], true)
+        || preg_match(
+            '#^/api/administracion/unidades/[1-9][0-9]*/cobros$#D',
+            $ruta
+        ) === 1
+        || preg_match(
+            '#^/api/administracion/contratos/[1-9][0-9]*/documento$#D',
+            $ruta
+        ) === 1
+    ))
+    || ($metodo === 'POST' && (
+        $ruta === '/api/administracion/contratos'
+        || preg_match(
+            '#^/api/administracion/contratos/[1-9][0-9]*/documento$#D',
+            $ruta
+        ) === 1
+    ))
+);
+
+
+$rutaReglasCobro = is_string($ruta) && (
+    (
+        $metodo === 'GET'
+        && (
+            in_array(
+                $ruta,
+                [
+                    '/api/administracion/reglas-cobro',
+                    '/api/administracion/reglas-cobro/conceptos'
+                ],
+                true
+            )
+            || preg_match(
+                '#^/api/administracion/reglas-cobro/[1-9][0-9]*$#D',
+                $ruta
+            ) === 1
+        )
+    )
+    || (
+        $metodo === 'POST'
+        && $ruta === '/api/administracion/reglas-cobro'
+    )
+    || (
+        $metodo === 'PUT'
+        && preg_match(
+            '#^/api/administracion/reglas-cobro/[1-9][0-9]*$#D',
+            $ruta
+        ) === 1
+    )
+);
+
+$rutaSimulacionAdeudos = is_string($ruta)
+    && $metodo === 'GET'
+    && $ruta === '/api/administracion/adeudos/simulacion';
+
+
+
 $rutaResidentes = $ruta === '/api/incidencias/residentes';
+
+// HU04.2: rutas adicionales de conciliación de pagos.
+$rutaConciliacion = ($metodo === 'GET' && in_array($ruta, ['/api/conciliacion', '/api/conciliacion/recibo'], true))
+    || ($metodo === 'POST' && in_array($ruta, ['/api/conciliacion/aprobar', '/api/conciliacion/rechazar'], true));
 
 $rutaHu05 = is_string($ruta) && (
     $ruta === '/api/incidencias'
@@ -115,7 +197,7 @@ try {
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
 
-    if (!$rutaHu07 && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
+    if (!$rutaHu07 && !$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos  && !$rutaContratosAdministrativos && !$rutaReglasCobro && !$rutaSimulacionAdeudos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -150,15 +232,145 @@ try {
 
     $controlador = new AutenticacionControlador($servicio);
 
-    // HU07: autenticar cada solicitud con el mecanismo web/móvil ya existente.
+    // HU07: autenticar cada solicitud con el mecanismo web/movil existente.
     if ($rutaHu07) {
         $usuario = AutenticacionSolicitud::usuario($servicio);
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesion no valida o vencida.']);
+            exit;
+        }
+        (new Hu07Controlador(new Hu07Repositorio($conexion), $usuario, $ruta, $metodo))->procesar();
+        exit;
+    }
+
+if ($rutaContratosAdministrativos) {
+    $usuario = $servicio->verificarTokenWeb(
+        $_COOKIE['alkira_token'] ?? null
+    );
+
+    if ($usuario === null) {
+        http_response_code(401);
+
+        echo json_encode([
+            'mensaje' => 'Sesión administrativa no válida o vencida.'
+        ], JSON_UNESCAPED_UNICODE);
+
+        exit;
+    }
+
+    $repositorioContratos = new ContratosAdministrativosRepositorio(
+        $conexion
+    );
+
+    $servicioContratos = new ContratosAdministrativosServicio(
+        $repositorioContratos,
+        $conexion
+    );
+
+    $controladorContratos = new ContratosAdministrativosControlador(
+        $servicioContratos
+    );
+
+    $controladorContratos->procesar(
+        $metodo,
+        $ruta,
+        $usuario
+    );
+
+    exit;
+}
+
+
+if ($rutaReglasCobro) {
+    $usuario = $servicio->verificarTokenWeb(
+        $_COOKIE['alkira_token'] ?? null
+    );
+
+    if ($usuario === null) {
+        http_response_code(401);
+
+        echo json_encode([
+            'mensaje' => 'Sesión administrativa no válida o vencida.'
+        ], JSON_UNESCAPED_UNICODE);
+
+        exit;
+    }
+
+    $repositorioReglas = new ReglasCobroRepositorio(
+        $conexion
+    );
+
+    $servicioReglas = new ReglasCobroServicio(
+        $repositorioReglas
+    );
+
+    $controladorReglas = new ReglasCobroControlador(
+        $servicioReglas
+    );
+
+    $controladorReglas->procesar(
+        $metodo,
+        $ruta,
+        $usuario
+    );
+
+    exit;
+}
+
+
+if ($rutaSimulacionAdeudos) {
+    // Validar la sesión administrativa existente.
+    $usuario = $servicio->verificarTokenWeb(
+        $_COOKIE['alkira_token'] ?? null
+    );
+
+    if ($usuario === null) {
+        http_response_code(401);
+
+        echo json_encode([
+            'mensaje' => 'Sesión administrativa no válida o vencida.'
+        ], JSON_UNESCAPED_UNICODE);
+
+        exit;
+    }
+
+    // Construir las capas del Módulo 02.
+    $repositorioGeneracion = new GeneracionAdeudosRepositorio(
+        $conexion
+    );
+
+    $servicioGeneracion = new GeneracionAdeudosServicio(
+        $repositorioGeneracion
+    );
+
+    $controladorGeneracion = new GeneracionAdeudosControlador(
+        $servicioGeneracion
+    );
+
+    // El controlador verifica el rol del administrador.
+    $controladorGeneracion->procesar(
+        $metodo,
+        $ruta,
+        $usuario
+    );
+
+    exit;
+}
+
+
+
+
+    // HU04.2: procesar conciliación sin modificar el preregistro de HU03.2.
+    if ($rutaConciliacion) {
+        $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
         if ($usuario === null) {
             http_response_code(401);
             echo json_encode(['mensaje' => 'Sesión no válida o vencida.']);
             exit;
         }
-        (new Hu07Controlador(new Hu07Repositorio($conexion), $usuario, $ruta, $metodo))->procesar();
+        (new ConciliacionControlador(new ConciliacionRepositorio($conexion)))->procesar($metodo, $ruta, $usuario);
+        exit;
     }
 
     // ============================================
