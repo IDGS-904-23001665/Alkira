@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react'
 
 const COLUMNAS_PAGOS = [
@@ -89,17 +88,13 @@ function imprimirInforme(reporte, periodo, idInmueble) {
     <table>
       <thead>
         <tr>
-          ${columnas.map((c) =>
-            `<th>${escaparHtml(c.titulo)}</th>`
-          ).join('')}
+          ${columnas.map((c) => `<th>${escaparHtml(c.titulo)}</th>`).join('')}
         </tr>
       </thead>
       <tbody>
         ${filas.map((fila) => `
           <tr>
-            ${columnas.map((c) =>
-              `<td>${escaparHtml(fila[c.campo])}</td>`
-            ).join('')}
+            ${columnas.map((c) => `<td>${escaparHtml(fila[c.campo])}</td>`).join('')}
           </tr>
         `).join('')}
       </tbody>
@@ -125,50 +120,34 @@ function imprimirInforme(reporte, periodo, idInmueble) {
           padding: 22px;
           color: #17223b;
         }
-
         h1 { font-size: 22px; }
-
-        h2 {
-          font-size: 16px;
-          margin-top: 25px;
-        }
-
+        h2 { font-size: 16px; margin-top: 25px; }
         table {
           border-collapse: collapse;
           width: 100%;
           font-size: 11px;
         }
-
         th, td {
           border: 1px solid #bbb;
           padding: 6px;
           text-align: left;
           overflow-wrap: anywhere;
         }
-
         th { background: #eee; }
-
         small { color: #555; }
-
         li { margin: 5px 0; }
-
         @page {
           size: landscape;
           margin: 12mm;
         }
       </style>
     </head>
-
     <body>
       <h1>ALKIRA — Informe KDD</h1>
-
       <p>
-        Inmueble:
-        ${escaparHtml(idInmueble || 'Todos')}
-        · Periodo:
-        ${escaparHtml(periodo || 'Todos')}
+        Inmueble: ${escaparHtml(idInmueble || 'Todos')}
+        · Periodo: ${escaparHtml(periodo || 'Todos')}
       </p>
-
       <p>
         <small>
           Reporte descriptivo. Máximo 200 filas por tabla.
@@ -181,23 +160,9 @@ function imprimirInforme(reporte, periodo, idInmueble) {
         ${patrones || '<li>Sin hallazgos en los filtros.</li>'}
       </ul>
 
-      ${tabla(
-        'Pagos registrados',
-        COLUMNAS_PAGOS,
-        reporte.pagos
-      )}
-
-      ${tabla(
-        'Incidencias y mantenimiento',
-        COLUMNAS_MANTENIMIENTO,
-        reporte.mantenimiento
-      )}
-
-      ${tabla(
-        'Alertas de morosidad',
-        COLUMNAS_ALERTAS,
-        reporte.alertas
-      )}
+      ${tabla('Pagos registrados', COLUMNAS_PAGOS, reporte.pagos)}
+      ${tabla('Incidencias y mantenimiento', COLUMNAS_MANTENIMIENTO, reporte.mantenimiento)}
+      ${tabla('Alertas de morosidad', COLUMNAS_ALERTAS, reporte.alertas)}
     </body>
     </html>
   `
@@ -206,8 +171,7 @@ function imprimirInforme(reporte, periodo, idInmueble) {
 
   if (!ventana) {
     window.alert(
-      'El navegador bloqueó la ventana de impresión. ' +
-      'Permite ventanas emergentes para localhost.'
+      'El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para localhost.'
     )
     return
   }
@@ -219,6 +183,25 @@ function imprimirInforme(reporte, periodo, idInmueble) {
   ventana.print()
 }
 
+function colorPatron(patron) {
+  const texto = `${patron?.titulo ?? ''} ${patron?.detalle ?? ''}`.toLowerCase()
+
+  if (
+    texto.includes('venc') ||
+    texto.includes('moros') ||
+    texto.includes('urgente') ||
+    texto.includes('alta')
+  ) {
+    return 'warning'
+  }
+
+  if (texto.includes('pago') || texto.includes('aplic')) {
+    return 'success'
+  }
+
+  return 'info'
+}
+
 function TablaKdd({
   titulo,
   columnas,
@@ -228,7 +211,6 @@ function TablaKdd({
   return (
     <div className="card border-0 shadow-sm mb-4">
       <div className="card-body">
-
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <h3 className="h6 fw-bold mb-0">
             {titulo} ({filas.length})
@@ -237,9 +219,7 @@ function TablaKdd({
           <button
             type="button"
             className="btn btn-outline-primary btn-sm"
-            onClick={() =>
-              descargarCsv(nombreArchivo, columnas, filas)
-            }
+            onClick={() => descargarCsv(nombreArchivo, columnas, filas)}
           >
             Descargar CSV
           </button>
@@ -255,10 +235,7 @@ function TablaKdd({
               <thead>
                 <tr>
                   {columnas.map((columna) => (
-                    <th
-                      key={columna.campo}
-                      scope="col"
-                    >
+                    <th key={columna.campo} scope="col">
                       {columna.titulo}
                     </th>
                   ))}
@@ -338,20 +315,16 @@ function HistorialesKdd({ idInmueble, periodo }) {
           !Array.isArray(datos.alertas) ||
           !Array.isArray(datos.patrones)
         ) {
-          throw new Error(
-            'La API devolvió un reporte incompleto.'
-          )
+          throw new Error('La API devolvió un reporte incompleto.')
         }
 
         if (!controlador.signal.aborted) {
           setReporte(datos)
         }
-
       } catch (errorConsulta) {
         if (!controlador.signal.aborted) {
           setError(errorConsulta.message)
         }
-
       } finally {
         if (!controlador.signal.aborted) {
           setCargando(false)
@@ -360,15 +333,11 @@ function HistorialesKdd({ idInmueble, periodo }) {
     }
 
     cargarReportes()
-
     return () => controlador.abort()
   }, [idInmueble, periodo])
 
   return (
-    <section
-      className="mt-5"
-      aria-label="Historiales y reportes KDD"
-    >
+    <section className="mt-2" aria-label="Historiales y reportes KDD">
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
           <h2 className="h5 fw-bold mb-1">
@@ -376,8 +345,7 @@ function HistorialesKdd({ idInmueble, periodo }) {
           </h2>
 
           <p className="text-secondary small mb-0">
-            Información calculada desde MySQL usando los
-            mismos filtros del dashboard.
+            Esta es la parte del paso 59: aquí validas tablas, alertas y exportaciones.
           </p>
         </div>
 
@@ -385,13 +353,21 @@ function HistorialesKdd({ idInmueble, periodo }) {
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            onClick={() =>
-              imprimirInforme(reporte, periodo, idInmueble)
-            }
+            onClick={() => imprimirInforme(reporte, periodo, idInmueble)}
           >
             Imprimir / Guardar PDF
           </button>
         )}
+      </div>
+
+      <div className="kdd-help-box mb-4">
+        <h4 className="h6 fw-bold">Qué debes revisar aquí</h4>
+        <ol className="small text-secondary">
+          <li>Que las tablas cambien según el periodo o inmueble seleccionado.</li>
+          <li>Que los pagos, incidencias y alertas coincidan con MySQL.</li>
+          <li>Que el CSV descargue el contenido correcto.</li>
+          <li>Que “Imprimir / Guardar PDF” genere el reporte final.</li>
+        </ol>
       </div>
 
       {cargando && (
@@ -408,31 +384,69 @@ function HistorialesKdd({ idInmueble, periodo }) {
 
       {reporte && !cargando && (
         <>
-          <div className="card border-0 shadow-sm mb-4">
-            <div className="card-body">
-              <h3 className="h6 fw-bold">
-                Hallazgos KDD
-              </h3>
-
-              {reporte.patrones.length === 0 ? (
-                <p className="text-secondary small mb-0">
-                  No se detectaron alertas con estas
-                  reglas y filtros.
-                </p>
-              ) : (
-                <ul className="mb-0">
-                  {reporte.patrones.map((patron, indice) => (
-                    <li
-                      key={`${patron.tipo}-${indice}`}
-                      className="mb-2"
-                    >
-                      <strong>{patron.titulo}:</strong>{' '}
-                      {patron.detalle}
-                    </li>
-                  ))}
-                </ul>
-              )}
+          <div className="kdd-insights-grid mb-4">
+            <div className="kdd-insight">
+              <div className="kdd-insight__title">Pagos encontrados</div>
+              <div className="kdd-insight__value">{reporte.pagos.length}</div>
+              <p className="text-secondary small mb-0">
+                Registros de pago dentro del filtro actual.
+              </p>
             </div>
+
+            <div className="kdd-insight">
+              <div className="kdd-insight__title">Incidencias / mantenimiento</div>
+              <div className="kdd-insight__value">{reporte.mantenimiento.length}</div>
+              <p className="text-secondary small mb-0">
+                Registros operativos relacionados al análisis.
+              </p>
+            </div>
+
+            <div className="kdd-insight">
+              <div className="kdd-insight__title">Alertas de morosidad</div>
+              <div className="kdd-insight__value">{reporte.alertas.length}</div>
+              <p className="text-secondary small mb-0">
+                Reglas descriptivas activadas en el periodo seleccionado.
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <h3 className="h6 fw-bold mb-3">Hallazgos KDD</h3>
+
+            {reporte.patrones.length === 0 ? (
+              <div className="card border-0 shadow-sm">
+                <div className="card-body">
+                  <p className="text-secondary small mb-0">
+                    No se detectaron alertas con estas reglas y filtros.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="kdd-pattern-grid">
+                {reporte.patrones.map((patron, indice) => {
+                  const tono = colorPatron(patron)
+
+                  return (
+                    <div
+                      key={`${patron.tipo}-${indice}`}
+                      className="kdd-pattern-card"
+                    >
+                      <span className={`kdd-pattern-badge kdd-pattern-badge--${tono}`}>
+                        {patron.tipo || 'Hallazgo'}
+                      </span>
+
+                      <h4 className="h6 fw-bold mb-2">
+                        {patron.titulo}
+                      </h4>
+
+                      <p className="text-secondary small mb-0">
+                        {patron.detalle}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           <TablaKdd
@@ -457,13 +471,10 @@ function HistorialesKdd({ idInmueble, periodo }) {
           />
 
           <div className="alert alert-info small">
-            Cada tabla muestra un máximo de{' '}
-            {reporte.limitePorLista} registros.
-            Los pagos en revisión no equivalen a pagos
-            aprobados. Las alertas son reglas descriptivas,
-            no predicciones entrenadas con IA.
-            Para guardar PDF, selecciona
-            «Guardar como PDF» en la impresión.
+            Cada tabla muestra un máximo de {reporte.limitePorLista} registros.
+            Los pagos en revisión no equivalen a pagos aprobados.
+            Las alertas son descriptivas, no un modelo predictivo entrenado.
+            Para guardar el PDF usa el botón “Imprimir / Guardar PDF”.
           </div>
         </>
       )}
@@ -471,4 +482,4 @@ function HistorialesKdd({ idInmueble, periodo }) {
   )
 }
 
-export default HistorialesKdd
+export default HistorialesKdd 
