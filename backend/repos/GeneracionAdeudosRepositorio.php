@@ -9,10 +9,7 @@ final class GeneracionAdeudosRepositorio
     }
 
     /**
-     * Consulta los contratos vigentes y sus unidades.
-     *
-     * El servicio verificará posteriormente
-     * las fechas del contrato para cada periodo.
+     * Consulta contratos vigentes y sus unidades.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -39,8 +36,7 @@ final class GeneracionAdeudosRepositorio
     }
 
     /**
-     * Obtiene las reglas de mantenimiento
-     * mensuales que están activas.
+     * Obtiene las reglas mensuales activas.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -74,7 +70,7 @@ final class GeneracionAdeudosRepositorio
     }
 
     /**
-     * Inicia la transacción del proceso mensual.
+     * Inicia una transacción.
      */
     public function iniciarTransaccion(): void
     {
@@ -88,7 +84,7 @@ final class GeneracionAdeudosRepositorio
     }
 
     /**
-     * Confirma los cobros generados.
+     * Confirma los cambios.
      */
     public function confirmarTransaccion(): void
     {
@@ -102,7 +98,7 @@ final class GeneracionAdeudosRepositorio
     }
 
     /**
-     * Deshace los cambios si ocurre un error.
+     * Revierte los cambios.
      */
     public function revertirTransaccion(): void
     {
@@ -112,11 +108,7 @@ final class GeneracionAdeudosRepositorio
     }
 
     /**
-     * Bloquea un contrato dentro de la transacción.
-     *
-     * Esto permite que dos ejecuciones del
-     * generador no procesen simultáneamente
-     * el mismo contrato.
+     * Bloquea un contrato durante la generación.
      *
      * @return array<string, mixed>|false
      */
@@ -155,21 +147,24 @@ final class GeneracionAdeudosRepositorio
     }
 
     /**
-     * Revisa si un contrato ya tiene mantenimiento
-     * registrado para el periodo solicitado.
+     * Verifica si existe mantenimiento para
+     * un contrato y periodo.
      *
-     * Comprueba el tipo de concepto y no
-     * únicamente el identificador.
+     * Fuera de una transacción:
+     * utiliza una lectura normal.
      *
-     * Así detecta cobros registrados con
-     * conceptos distintos de mantenimiento.
+     * Dentro de una transacción:
+     * realiza una lectura con FOR UPDATE.
      */
     public function existeCobroMantenimiento(
         int $idContrato,
         string $periodo
     ): bool {
-        $consulta = $this->conexion->prepare(
-            <<<'SQL'
+        $clausulaBloqueo = $this->conexion->inTransaction()
+            ? ' FOR UPDATE'
+            : '';
+
+        $consultaSql = <<<'SQL'
             SELECT
                 ec.id_estado_cuenta
             FROM estados_cuenta ec
@@ -179,7 +174,10 @@ final class GeneracionAdeudosRepositorio
               AND ec.periodo = :periodo
               AND cc.tipo_concepto = 'mantenimiento'
             LIMIT 1
-            SQL
+            SQL;
+
+        $consulta = $this->conexion->prepare(
+            $consultaSql . $clausulaBloqueo
         );
 
         $consulta->execute([
@@ -191,13 +189,9 @@ final class GeneracionAdeudosRepositorio
     }
 
     /**
-     * Registra un adeudo de mantenimiento.
+     * Registra un adeudo nuevo.
      *
-     * Los valores deben llegar validados
-     * desde GeneracionAdeudosServicio.
-     *
-     * El recargo comienza en cero: no se
-     * cobra mora al emitir el adeudo.
+     * Requiere transacción activa.
      */
     public function crearAdeudo(
         int $idContrato,

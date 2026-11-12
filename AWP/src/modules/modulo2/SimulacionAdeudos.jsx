@@ -22,6 +22,14 @@ const ESTADOS_SIMULACION = {
     nombre: 'Pendiente de definición',
     clase: 'text-bg-warning',
   },
+  periodo_pasado: {
+    nombre: 'Periodo anterior',
+    clase: 'text-bg-secondary',
+  },
+  plazo_vencido: {
+    nombre: 'Plazo vencido',
+    clase: 'text-bg-warning',
+  },
 }
 
 function obtenerPeriodoActual() {

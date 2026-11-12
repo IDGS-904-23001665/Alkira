@@ -137,9 +137,10 @@ $rutaReglasCobro = is_string($ruta) && (
     )
 );
 
-$rutaSimulacionAdeudos = is_string($ruta)
-    && $metodo === 'GET'
-    && $ruta === '/api/administracion/adeudos/simulacion';
+$rutaSimulacionAdeudos = is_string($ruta) && (
+    ($metodo === 'GET' && $ruta === '/api/administracion/adeudos/simulacion')
+    || ($metodo === 'POST' && $ruta === '/api/administracion/adeudos/generar')
+);
 
 
 
@@ -344,9 +345,71 @@ if ($rutaSimulacionAdeudos) {
         $repositorioGeneracion
     );
 
-    $controladorGeneracion = new GeneracionAdeudosControlador(
-        $servicioGeneracion
+    
+    // HU02.3: la generación real permanece
+    // deshabilitada por defecto.
+    //
+    // Solo podrá activarse explícitamente
+    // en el servidor PHP local de desarrollo.
+    
+    // HU02.3: permitir generación real
+    // exclusivamente durante el desarrollo local.
+    //
+    // Por defecto permanece deshabilitada.
+    $generacionHabilitada = false;
+
+    $interruptorActivo = (
+        getenv('ALKIRA_GENERACION_ADEUDOS_HABILITADA') === '1'
     );
+
+    $servidorPhpLocal = (
+        PHP_SAPI === 'cli-server'
+    );
+
+    $peticionLocal = in_array(
+        $_SERVER['REMOTE_ADDR'] ?? '',
+        ['127.0.0.1', '::1'],
+        true
+    );
+
+    if (
+        $interruptorActivo
+        && $servidorPhpLocal
+        && $peticionLocal
+    ) {
+        $rutaConfiguracion = dirname(__DIR__)
+            . '/config/baseDatos.local.php';
+
+        $configuracionLocal = require $rutaConfiguracion;
+
+        $baseDatosLocal = (
+            is_array($configuracionLocal)
+            && in_array(
+                $configuracionLocal['servidor'] ?? null,
+                ['localhost', '127.0.0.1', '::1'],
+                true
+            )
+            && ($configuracionLocal['baseDatos'] ?? null) === 'alkira'
+        );
+
+        $generacionHabilitada = $baseDatosLocal;
+    }
+
+
+    $ejecutorGeneracion = null;
+
+    if ($generacionHabilitada) {
+        $ejecutorGeneracion = new EjecucionAdeudosServicio(
+            $repositorioGeneracion,
+            $servicioGeneracion
+        );
+    }
+
+    $controladorGeneracion = new GeneracionAdeudosControlador(
+        $servicioGeneracion,
+        $ejecutorGeneracion
+    );
+
 
     // El controlador verifica el rol del administrador.
     $controladorGeneracion->procesar(
