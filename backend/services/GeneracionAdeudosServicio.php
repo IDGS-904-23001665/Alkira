@@ -21,15 +21,21 @@ final class GeneracionAdeudosServicio
     }
 
     /**
-     * Simula la generación mensual de adeudos.
-     *
-     * No inserta, actualiza ni elimina registros.
+     * Simula los adeudos del periodo sin escribir en MySQL.
      *
      * @return array<string, mixed>
      */
     public function simularPeriodo(string $periodo): array
     {
         $fechaBase = $this->validarPeriodo($periodo);
+
+        $hoy = new DateTimeImmutable(
+            'today',
+            new DateTimeZone('America/Mexico_City')
+        );
+
+        $periodoActual = $hoy->format('Y-m');
+        $fechaActual = $hoy->format('Y-m-d');
 
         $contratos = $this->repositorio
             ->listarContratosVigentes();
@@ -42,23 +48,24 @@ final class GeneracionAdeudosServicio
         );
 
         $detalle = [];
-
         $generables = 0;
         $omitidos = 0;
         $pendientesDefinicion = 0;
 
         foreach ($contratos as $contrato) {
             $idContrato = (int) $contrato['idContrato'];
-
+            $idUnidad = (int) $contrato['idUnidad'];
             $tipoUnidad = (string) $contrato['tipoUnidad'];
 
             $regla = $reglasPorAlcance[$tipoUnidad]
                 ?? $reglasPorAlcance['general']
                 ?? null;
 
+            // No existe una regla aplicable.
             if ($regla === null) {
                 $detalle[] = [
                     'idContrato' => $idContrato,
+                    'idUnidad' => $idUnidad,
                     'tipoUnidad' => $tipoUnidad,
                     'resultado' => 'sin_regla',
                     'motivo' => 'No existe una regla activa aplicable.'
@@ -68,30 +75,56 @@ final class GeneracionAdeudosServicio
                 continue;
             }
 
-            $fechaEmision = $this->calcularFecha(
-                $fechaBase,
-                (int) $regla['diaCorte']
-            );
+            $idReglaCobro = (int) $regla['idReglaCobro'];
+            $diaCorte = (int) $regla['diaCorte'];
+            $diaLimitePago = (int) $regla['diaLimitePago'];
 
-            $fechaLimitePago = $this->calcularFecha(
-                $fechaBase,
-                (int) $regla['diaLimitePago']
-            );
-
-            // Todavía no definimos si el vencimiento
-            // puede pasar al mes siguiente.
-            if ($fechaLimitePago < $fechaEmision) {
+            // El límite debe ser igual o posterior
+            // al corte dentro del mismo mes.
+            if ($diaLimitePago < $diaCorte) {
                 $detalle[] = [
                     'idContrato' => $idContrato,
+                    'idUnidad' => $idUnidad,
                     'tipoUnidad' => $tipoUnidad,
-                    'idReglaCobro' => (int) $regla['idReglaCobro'],
+                    'idReglaCobro' => $idReglaCobro,
                     'resultado' => 'pendiente_definicion',
-                    'motivo' => 'La fecha límite resulta anterior al corte.'
+                    'motivo' => 'El día límite debe ser igual o posterior al día de corte.'
                 ];
 
                 $pendientesDefinicion++;
                 continue;
             }
+
+            // Ajustar días 29, 30 o 31 cuando
+            // el mes tenga menos días.
+            $fechaEmision = $this->calcularFecha(
+                $fechaBase,
+                $diaCorte
+            );
+
+            $fechaLimitePago = $this->calcularFecha(
+                $fechaBase,
+                $diaLimitePago
+            );
+
+            $montoPrincipal = $this->validarMonto(
+                $regla['montoCuota']
+            );
+
+            // Datos que utilizaremos para mostrar
+            // el detalle en la pantalla React.
+            $registro = [
+                'idContrato' => $idContrato,
+                'idUnidad' => $idUnidad,
+                'tipoUnidad' => $tipoUnidad,
+                'idReglaCobro' => $idReglaCobro,
+                'idConcepto' => (int) $regla['idConcepto'],
+                'periodo' => $periodo,
+                'fechaEmision' => $fechaEmision,
+                'fechaLimitePago' => $fechaLimitePago,
+                'montoPrincipal' => $montoPrincipal,
+                'recargoMora' => '0.00'
+            ];
 
             $fechaInicio = (string) $contrato['fechaInicio'];
 
@@ -99,9 +132,11 @@ final class GeneracionAdeudosServicio
                 ? null
                 : (string) $contrato['fechaFin'];
 
-            // Criterio provisional:
-            // el contrato debe estar vigente
-            // durante la fecha de emisión.
+            // El contrato debe estar vigente
+            // en la fecha del corte.
+            //
+            // Si comienza después del corte,
+            // no recibe mantenimiento ese mes.
             if (
                 $fechaInicio > $fechaEmision
                 || (
@@ -109,17 +144,18 @@ final class GeneracionAdeudosServicio
                     && $fechaFin < $fechaEmision
                 )
             ) {
-                $detalle[] = [
-                    'idContrato' => $idContrato,
-                    'tipoUnidad' => $tipoUnidad,
-                    'resultado' => 'fuera_vigencia',
-                    'motivo' => 'El contrato no cubre la fecha de emisión.'
-                ];
+                $registro['resultado'] = 'fuera_vigencia';
+                $registro['motivo'] =
+                    'El contrato no está vigente en la fecha de corte.';
 
+                $detalle[] = $registro;
                 $omitidos++;
                 continue;
             }
 
+            // Buscar cualquier mantenimiento del
+            // contrato y periodo, aunque utilice
+            // un concepto de cobro diferente.
             $existeCobro = $this->repositorio
                 ->existeCobroMantenimiento(
                     $idContrato,
@@ -127,36 +163,45 @@ final class GeneracionAdeudosServicio
                 );
 
             if ($existeCobro) {
-                $detalle[] = [
-                    'idContrato' => $idContrato,
-                    'tipoUnidad' => $tipoUnidad,
-                    'resultado' => 'ya_registrado',
-                    'motivo' => 'Ya existe mantenimiento para este periodo.'
-                ];
+                $registro['resultado'] = 'ya_registrado';
+                $registro['motivo'] =
+                    'Ya existe mantenimiento para este contrato y periodo.';
 
+                $detalle[] = $registro;
                 $omitidos++;
                 continue;
             }
 
-            $montoPrincipal = $this->validarMonto(
-                $regla['montoCuota']
-            );
+            // No permitir nuevas generaciones
+            // para meses anteriores.
+            if ($periodo < $periodoActual) {
+                $registro['resultado'] = 'periodo_pasado';
+                $registro['motivo'] =
+                    'La generación retroactiva no está permitida.';
 
-            $detalle[] = [
-                'idContrato' => $idContrato,
-                'idUnidad' => (int) $contrato['idUnidad'],
-                'tipoUnidad' => $tipoUnidad,
-                'idReglaCobro' => (int) $regla['idReglaCobro'],
-                'idConcepto' => (int) $regla['idConcepto'],
-                'periodo' => $periodo,
-                'fechaEmision' => $fechaEmision,
-                'fechaLimitePago' => $fechaLimitePago,
-                'montoPrincipal' => $montoPrincipal,
-                'recargoMora' => '0.00',
-                'resultado' => 'generable',
-                'motivo' => 'El contrato puede recibir el adeudo.'
-            ];
+                $detalle[] = $registro;
+                $omitidos++;
+                continue;
+            }
 
+            // Evitar que un cobro nuevo nazca
+            // con su fecha límite ya vencida.
+            if ($fechaLimitePago < $fechaActual) {
+                $registro['resultado'] = 'plazo_vencido';
+                $registro['motivo'] =
+                    'La fecha límite de pago ya transcurrió.';
+
+                $detalle[] = $registro;
+                $omitidos++;
+                continue;
+            }
+
+            // El contrato cumple todas las reglas.
+            $registro['resultado'] = 'generable';
+            $registro['motivo'] =
+                'El contrato puede recibir el adeudo sin recargo inicial.';
+
+            $detalle[] = $registro;
             $generables++;
         }
 
@@ -173,7 +218,7 @@ final class GeneracionAdeudosServicio
     }
 
     /**
-     * Valida el periodo YYYY-MM.
+     * Valida el formato YYYY-MM.
      */
     private function validarPeriodo(
         string $periodo
@@ -207,10 +252,7 @@ final class GeneracionAdeudosServicio
     }
 
     /**
-     * Organiza las reglas por alcance.
-     *
-     * No permite dos reglas activas
-     * para el mismo tipo de unidad.
+     * Organiza las reglas activas por alcance.
      *
      * @param array<int, array<string, mixed>> $reglas
      * @return array<string, array<string, mixed>>
@@ -237,8 +279,8 @@ final class GeneracionAdeudosServicio
 
             if (isset($reglasPorAlcance[$alcance])) {
                 throw new DomainException(
-                    'Existen varias reglas activas para '
-                    . "el alcance {$alcance}."
+                    'Existen varias reglas activas para el alcance '
+                    . $alcance . '.'
                 );
             }
 
@@ -249,13 +291,13 @@ final class GeneracionAdeudosServicio
     }
 
     /**
-     * Calcula una fecha del periodo.
+     * Calcula una fecha dentro del periodo.
      *
-     * Criterio provisional:
-     * si el día configurado no existe,
+     * Si el día configurado no existe,
      * utiliza el último día del mes.
      *
-     * Ejemplo: día 31 en febrero -> 28 o 29.
+     * Ejemplo:
+     * 2027-02, día 31 => 2027-02-28.
      */
     private function calcularFecha(
         DateTimeImmutable $fechaBase,
@@ -267,25 +309,23 @@ final class GeneracionAdeudosServicio
             );
         }
 
-        $ultimoDia = (int) $fechaBase->format('t');
+        $diaAplicable = min(
+            $dia,
+            (int) $fechaBase->format('t')
+        );
 
-        $diaAplicable = min($dia, $ultimoDia);
-
-        return $fechaBase
-            ->setDate(
-                (int) $fechaBase->format('Y'),
-                (int) $fechaBase->format('m'),
-                $diaAplicable
-            )
-            ->format('Y-m-d');
+        return $fechaBase->setDate(
+            (int) $fechaBase->format('Y'),
+            (int) $fechaBase->format('m'),
+            $diaAplicable
+        )->format('Y-m-d');
     }
 
     /**
-     * Valida el formato DECIMAL(12,2).
+     * Valida y normaliza DECIMAL(12,2).
      */
-    private function validarMonto(
-        mixed $monto
-    ): string {
+    private function validarMonto(mixed $monto): string
+    {
         if (
             !is_string($monto)
             && !is_int($monto)
@@ -311,12 +351,11 @@ final class GeneracionAdeudosServicio
 
         $partes = explode('.', $valor);
 
-        return $partes[0] . '.'
-            . str_pad(
-                $partes[1] ?? '',
-                2,
-                '0',
-                STR_PAD_RIGHT
-            );
+        return $partes[0] . '.' . str_pad(
+            $partes[1] ?? '',
+            2,
+            '0',
+            STR_PAD_RIGHT
+        );
     }
 }
