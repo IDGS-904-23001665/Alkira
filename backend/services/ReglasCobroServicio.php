@@ -150,6 +150,14 @@ final class ReglasCobroServicio
             'cuota'
         );
 
+        // La cuota de mantenimiento debe ser mayor que cero.
+        // El recargo sí puede valer 0.00 si no se cobra mora.
+        if ($montoCuota === '0.00') {
+            throw new InvalidArgumentException(
+                'La cuota de mantenimiento debe ser mayor que cero.'
+            );
+        }
+
         $tipoRecargo = $datos['tipoRecargo'] ?? null;
 
         if (
