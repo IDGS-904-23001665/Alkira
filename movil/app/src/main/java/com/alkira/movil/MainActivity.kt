@@ -102,7 +102,8 @@ private fun AplicacionAutenticada(
     onCerrarSesion: () -> Unit
 ) {
     val contexto = LocalContext.current
-    val solicitudPermiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* El centro de avisos sigue disponible aun sin permiso */ }
+    val solicitudPermiso =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* El centro de avisos sigue disponible aun sin permiso */ }
     LaunchedEffect(usuario.idUsuario) { PushAlkira.registrar(contexto) }
     LaunchedEffect(usuario.idUsuario) {
         if (PushAlkira.configurado() && Build.VERSION.SDK_INT >= 33) {
@@ -156,8 +157,17 @@ private fun AplicacionAutenticada(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text("${usuario.nombres} ${usuario.apellidos}".trim(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White)
-                            Text(usuario.tipoUsuario.replaceFirstChar { it.uppercase() }, fontSize = 11.sp, color = AlkiraTextMuted)
+                            Text(
+                                "${usuario.nombres} ${usuario.apellidos}".trim(),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = Color.White
+                            )
+                            Text(
+                                usuario.tipoUsuario.replaceFirstChar { it.uppercase() },
+                                fontSize = 11.sp,
+                                color = AlkiraTextMuted
+                            )
                         }
                     }
                 }
@@ -171,44 +181,68 @@ private fun AplicacionAutenticada(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if (!esTecnico) {
-                    DrawerItem("Inicio", Icons.Outlined.Home, currentScreen == "INICIO") {
-                        currentScreen = "INICIO"
-                        scope.launch { drawerState.close() }
-                    }
-                    DrawerItem("Estado de Cuenta", Icons.AutoMirrored.Outlined.ReceiptLong, currentScreen == "PAGOS") {
-                        currentScreen = "PAGOS"
-                        scope.launch { drawerState.close() }
-                    }
-                    DrawerItem("Carga de Comprobante", Icons.Outlined.UploadFile, currentScreen == "SUBIR_PAGO") {
-                        currentScreen = "SUBIR_PAGO"
-                        scope.launch { drawerState.close() }
-                    }
+                        DrawerItem("Inicio", Icons.Outlined.Home, currentScreen == "INICIO") {
+                            currentScreen = "INICIO"
+                            scope.launch { drawerState.close() }
+                        }
+                        DrawerItem(
+                            "Estado de Cuenta",
+                            Icons.AutoMirrored.Outlined.ReceiptLong,
+                            currentScreen == "PAGOS"
+                        ) {
+                            currentScreen = "PAGOS"
+                            scope.launch { drawerState.close() }
+                        }
+
+                        DrawerItem(
+                            "Mis pagos y recibos",
+                            Icons.AutoMirrored.Outlined.ReceiptLong,
+                            currentScreen == "VALIDAR_PAGOS"
+                        ) {
+                            currentScreen = "VALIDAR_PAGOS"
+
+                            scope.launch {
+                                drawerState.close()
+                            }
+                        }
+                        DrawerItem("Carga de Comprobante", Icons.Outlined.UploadFile, currentScreen == "SUBIR_PAGO") {
+                            currentScreen = "SUBIR_PAGO"
+                            scope.launch { drawerState.close() }
+                        }
                     }
                     DrawerItem("Tickets y Servicios", Icons.Outlined.Build, currentScreen == "MANTENIMIENTO") {
                         currentScreen = "MANTENIMIENTO"
                         scope.launch { drawerState.close() }
                     }
                     if (!esTecnico) {
-                    DrawerItem("Reportar Incidencia", Icons.Outlined.ReportProblem, currentScreen == "REPORTAR_FALLA") {
-                        currentScreen = "REPORTAR_FALLA"
-                        scope.launch { drawerState.close() }
-                    }
-                    DrawerItem("Comunidad y Votaciones", Icons.Outlined.HowToVote, currentScreen == "COMUNIDAD") {
-                        currentScreen = "COMUNIDAD"
-                        scope.launch { drawerState.close() }
-                    }
-                    DrawerItem("Pases de Acceso QR", Icons.Outlined.QrCodeScanner, currentScreen == "PASES_QR") {
-                        currentScreen = "PASES_QR"
-                        scope.launch { drawerState.close() }
-                    }
-                    DrawerItem("Analítica & Métricas", Icons.Outlined.Analytics, currentScreen == "METRICAS") {
-                        currentScreen = "METRICAS"
-                        scope.launch { drawerState.close() }
-                    }
-                    DrawerItem("Propiedades e Inmuebles", Icons.Outlined.Apartment, currentScreen == "PROPIEDADES") {
-                        currentScreen = "PROPIEDADES"
-                        scope.launch { drawerState.close() }
-                    }
+                        DrawerItem(
+                            "Reportar Incidencia",
+                            Icons.Outlined.ReportProblem,
+                            currentScreen == "REPORTAR_FALLA"
+                        ) {
+                            currentScreen = "REPORTAR_FALLA"
+                            scope.launch { drawerState.close() }
+                        }
+                        DrawerItem("Comunidad y Votaciones", Icons.Outlined.HowToVote, currentScreen == "COMUNIDAD") {
+                            currentScreen = "COMUNIDAD"
+                            scope.launch { drawerState.close() }
+                        }
+                        DrawerItem("Pases de Acceso QR", Icons.Outlined.QrCodeScanner, currentScreen == "PASES_QR") {
+                            currentScreen = "PASES_QR"
+                            scope.launch { drawerState.close() }
+                        }
+                        DrawerItem("Analítica & Métricas", Icons.Outlined.Analytics, currentScreen == "METRICAS") {
+                            currentScreen = "METRICAS"
+                            scope.launch { drawerState.close() }
+                        }
+                        DrawerItem(
+                            "Mi Vivienda",
+                            Icons.Outlined.Apartment,
+                            currentScreen == "PROPIEDADES"
+                        ) {
+                            currentScreen = "PROPIEDADES"
+                            scope.launch { drawerState.close() }
+                        }
                     }
                     HorizontalDivider(color = AlkiraDarkNavyLight)
                     DrawerItem("Cerrar sesión", Icons.Outlined.Logout, false) {
@@ -258,57 +292,75 @@ private fun AplicacionAutenticada(
                         }
 
                         if (!esTecnico) {
-                        Surface(
-                            color = if (currentScreen == "CHAT") AlkiraPrimaryBlue else AlkiraDarkNavyLight,
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier.clickable { currentScreen = "CHAT" }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Surface(
+                                color = if (currentScreen == "CHAT") AlkiraPrimaryBlue else AlkiraDarkNavyLight,
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.clickable { currentScreen = "CHAT" }
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.AutoAwesome,
-                                    contentDescription = "Asistente IA",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Asistente IA",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.AutoAwesome,
+                                        contentDescription = "Asistente IA",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Asistente IA",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
-                        }
                         }
                     }
                 }
             },
             bottomBar = {
                 if (!esTecnico) {
-                Surface(
-                    color = AlkiraSurfaceWhite,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                ) {
-                    Row(
+                    Surface(
+                        color = AlkiraSurfaceWhite,
+                        shadowElevation = 8.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                        verticalAlignment = Alignment.CenterVertically
+                            .navigationBarsPadding()
                     ) {
-                        BottomNavItem("Inicio", Icons.Outlined.Home, currentScreen == "INICIO") { currentScreen = "INICIO" }
-                        BottomNavItem("Pagos", Icons.Outlined.CreditCard, currentScreen == "PAGOS") { currentScreen = "PAGOS" }
-                        BottomNavItem("Servicios", Icons.Outlined.Build, currentScreen == "MANTENIMIENTO") { currentScreen = "MANTENIMIENTO" }
-                        BottomNavItem("Comunidad", Icons.Outlined.HowToVote, currentScreen == "COMUNIDAD") { currentScreen = "COMUNIDAD" }
-                        BottomNavItem("Pases QR", Icons.Outlined.QrCodeScanner, currentScreen == "PASES_QR") { currentScreen = "PASES_QR" }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            BottomNavItem("Inicio", Icons.Outlined.Home, currentScreen == "INICIO") {
+                                currentScreen = "INICIO"
+                            }
+                            BottomNavItem(
+                                "Pagos",
+                                Icons.Outlined.CreditCard,
+                                currentScreen == "PAGOS"
+                            ) { currentScreen = "PAGOS" }
+                            BottomNavItem(
+                                "Servicios",
+                                Icons.Outlined.Build,
+                                currentScreen == "MANTENIMIENTO"
+                            ) { currentScreen = "MANTENIMIENTO" }
+                            BottomNavItem(
+                                "Comunidad",
+                                Icons.Outlined.HowToVote,
+                                currentScreen == "COMUNIDAD"
+                            ) { currentScreen = "COMUNIDAD" }
+                            BottomNavItem(
+                                "Pases QR",
+                                Icons.Outlined.QrCodeScanner,
+                                currentScreen == "PASES_QR"
+                            ) { currentScreen = "PASES_QR" }
+                        }
                     }
-                }
                 }
             }
         ) { innerPadding ->
@@ -321,6 +373,7 @@ private fun AplicacionAutenticada(
                     "REPORTAR_FALLA" -> estadosHistorias.SaveableStateProvider("HU05") {
                         IncidenciasScreen(navegacionActiva = !menuAbierto)
                     }
+
                     "PROPIEDADES" -> HU01_Screen()
                     "MANTENIMIENTO" -> TicketsScreen(onNavigateBack = { currentScreen = "INICIO" })
                     "COMUNIDAD" -> VotacionesScreen(onNavigateBack = { currentScreen = "INICIO" })
@@ -329,6 +382,7 @@ private fun AplicacionAutenticada(
                     "PASES_QR" -> estadosHistorias.SaveableStateProvider("HU10") {
                         PasesQrScreen(navegacionActiva = !menuAbierto, onNavigateBack = { currentScreen = "INICIO" })
                     }
+
                     else -> InicioScreen(onNavigate = { currentScreen = it })
                 }
             }

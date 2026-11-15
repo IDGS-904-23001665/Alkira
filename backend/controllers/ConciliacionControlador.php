@@ -79,7 +79,7 @@ final class ConciliacionControlador
      * Sin dependencias externas; conserva el mismo endpoint y los mismos datos.
      * No es un CFDI ni contiene una firma electrónica certificada.
      */
-    private function emitirPdf(array $datos): void
+    public function emitirPdf(array $datos): void
     {
         $folio = (string) ($datos['folio'] ?? '');
         $importe = number_format((float) ($datos['monto'] ?? 0), 2, '.', ',');

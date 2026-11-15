@@ -1,18 +1,19 @@
 <?php
-declare(strict_types=1);
 
+declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
-
 require_once dirname(__DIR__) . '/config/Conexion.php';
 require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
 require_once dirname(__DIR__) . '/controllers/KddControlador.php';
 require_once dirname(__DIR__) . '/repos/ComprobantesRepositorio.php';
 require_once dirname(__DIR__) . '/repos/ConciliacionRepositorio.php';
 require_once dirname(__DIR__) . '/controllers/ConciliacionControlador.php';
+require_once dirname(__DIR__) . '/controllers/RecibosMovilControlador.php';
 require_once dirname(__DIR__) . '/controllers/ComprobantesMovilControlador.php';
 require_once dirname(__DIR__) . '/controllers/InmueblesControlador.php';
+require_once dirname(__DIR__) . '/controllers/MiViviendaControlador.php';
 require_once dirname(__DIR__) . '/controllers/AdeudosControlador.php';
 require_once dirname(__DIR__) . '/controllers/HistorialContratosControlador.php';
 require_once dirname(__DIR__) . '/controllers/IncidenciasControlador.php';
@@ -26,19 +27,14 @@ require_once dirname(__DIR__) . '/controllers/Hu07Controlador.php';
 require_once dirname(__DIR__) . '/controllers/ContratosAdministrativosControlador.php';
 require_once dirname(__DIR__) . '/controllers/ReglasCobroControlador.php';
 require_once dirname(__DIR__) . '/controllers/GeneracionAdeudosControlador.php';
-
-
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-
 $rutaHu01 = is_string($ruta) && (
     preg_match('#^/api/inmuebles(?:/[1-9][0-9]*(?:/unidades)?)?$#D', $ruta) === 1
     || preg_match('#^/api/unidades/[1-9][0-9]*(?:/asignaciones)?$#D', $ruta) === 1
     || preg_match('#^/api/asignaciones/[1-9][0-9]*/finalizar$#D', $ruta) === 1
     || $ruta === '/api/usuarios/buscar'
 );
-
-
 $rutaTickets = is_string($ruta) && (
     ($metodo === 'GET' && (
         $ruta === '/api/tickets'
@@ -52,8 +48,6 @@ $rutaTickets = is_string($ruta) && (
         $ruta
     ) === 1)
 );
-
-
 $rutaOrdenesTrabajo = is_string($ruta) && (
     ($metodo === 'GET' && in_array($ruta, [
         '/api/mantenimiento/tickets',
@@ -62,14 +56,12 @@ $rutaOrdenesTrabajo = is_string($ruta) && (
     || ($metodo === 'POST'
         && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/asignar$#D', $ruta) === 1)
 );
-
 $rutaCierreMantenimiento = is_string($ruta) && (
     ($metodo === 'GET'
         && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/materiales$#D', $ruta) === 1)
     || ($metodo === 'POST'
         && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/cerrar$#D', $ruta) === 1)
 );
-
 $rutaHu07 = is_string($ruta) && (
     $ruta === '/api/hu07/inmuebles' || $ruta === '/api/hu07/comunicados'
     || $ruta === '/api/hu07/avisos' || $ruta === '/api/hu07/dispositivos'
@@ -77,9 +69,6 @@ $rutaHu07 = is_string($ruta) && (
     || preg_match('#^/api/hu07/avisos/[1-9][0-9]*/leer$#D', $ruta) === 1
     || preg_match('#^/api/hu07/votaciones/[1-9][0-9]*/(?:auditoria|votar)$#D', $ruta) === 1
 );
-
-
-
 $rutaContratosAdministrativos = is_string($ruta) && (
     ($metodo === 'GET' && (
         in_array($ruta, [
@@ -104,8 +93,6 @@ $rutaContratosAdministrativos = is_string($ruta) && (
         ) === 1
     ))
 );
-
-
 $rutaReglasCobro = is_string($ruta) && (
     (
         $metodo === 'GET'
@@ -136,39 +123,33 @@ $rutaReglasCobro = is_string($ruta) && (
         ) === 1
     )
 );
-
 $rutaSimulacionAdeudos = is_string($ruta) && (
     ($metodo === 'GET' && $ruta === '/api/administracion/adeudos/simulacion')
     || ($metodo === 'POST' && $ruta === '/api/administracion/adeudos/generar')
 );
-
-
-
+// HU04.1 - Descarga de recibo móvil con JWT Bearer.
+$rutaReciboMovil = $metodo === 'GET' && is_string($ruta)
+    && preg_match('#^/api/pagos/[1-9][0-9]*/recibo-movil$#D', $ruta) === 1;
 $rutaResidentes = $ruta === '/api/incidencias/residentes';
-
 // HU04.2: rutas adicionales de conciliación de pagos.
 $rutaConciliacion = ($metodo === 'GET' && in_array($ruta, ['/api/conciliacion', '/api/conciliacion/recibo'], true))
     || ($metodo === 'POST' && in_array($ruta, ['/api/conciliacion/aprobar', '/api/conciliacion/rechazar'], true));
-
 $rutaHu05 = is_string($ruta) && (
     $ruta === '/api/incidencias'
     || $ruta === '/api/incidencias/unidades'
     || preg_match('#^/api/incidencias/[1-9][0-9]*(?:/evidencias(?:/[1-9][0-9]*/archivo)?|/estado)?$#D', $ruta) === 1
 );
-
 $rutaHu10 = is_string($ruta) && (
     $ruta === '/api/accesos-qr'
     || $ruta === '/api/accesos-qr/bitacora'
     || $ruta === '/api/accesos-qr/validar'
     || preg_match('#^/api/accesos-qr/[1-9][0-9]*/revocar$#D', $ruta) === 1
 );
-
 try {
     if ($ruta === '/api/salud' && $metodo === 'GET') {
         echo json_encode(['estado' => 'disponible']);
         exit;
     }
-
     $rutasAutenticacion = [
         ['POST', '/api/auth/login'],
         ['GET',  '/api/auth/yo'],
@@ -181,7 +162,6 @@ try {
         ['GET', '/api/comprobantes/adeudos-movil'],
         ['POST', '/api/comprobantes/enviar-movil'],
     ];
-
     $rutasKdd = [
         ['GET', '/api/kdd/indicadores'],
         ['GET', '/api/kdd/inmuebles'],
@@ -189,30 +169,26 @@ try {
         ['GET', '/api/kdd/operativo'],
         ['GET', '/api/kdd/reportes'],
     ];
-
     $rutaAdeudos = $ruta === '/api/adeudos/pendientes' && $metodo === 'GET';
-
     $rutaHistorialContratos = $metodo === 'GET' && is_string($ruta) && (
         $ruta === '/api/pagos/historial'
         || $ruta === '/api/contratos'
         || preg_match('#^/api/contratos/[1-9][0-9]*/documento$#D', $ruta) === 1
     );
-
-    if (!$rutaHu07 && !$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos  && !$rutaContratosAdministrativos && !$rutaReglasCobro && !$rutaSimulacionAdeudos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
+    // HU01 móvil: consulta de vivienda del usuario autenticado.
+    $rutaMiVivienda = $metodo === 'GET' && $ruta === '/api/movil/mi-vivienda';
+    if (!$rutaReciboMovil && !$rutaHu07 && !$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !$rutaMiVivienda && !$rutaContratosAdministrativos && !$rutaReglasCobro && !$rutaSimulacionAdeudos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
     }
-
     $rutaClave = dirname(__DIR__)
         . '/config/autenticacion.local.php';
-
     if (!is_file($rutaClave)) {
         throw new RuntimeException(
             'Falta la configuración de autenticación.'
         );
     }
-
     $configuracion = require $rutaClave;
     if (
         !is_array($configuracion) ||
@@ -221,18 +197,39 @@ try {
     ) {
         throw new RuntimeException('La configuración de autenticación es inválida.');
     }
-
     $conexion = Conexion::obtenerConexion();
-
     $repositorio = new UsuariosRepositorio($conexion);
-
     $servicio = new AutenticacionServicio(
         $repositorio,
         $configuracion['claveJwt']
     );
-
     $controlador = new AutenticacionControlador($servicio);
 
+    // HU04.1 - Descarga protegida del recibo desde Android.
+    if ($rutaReciboMovil) {
+        $cabecera = $_SERVER['HTTP_AUTHORIZATION']
+            ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+        $token = null;
+        if (is_string($cabecera) && preg_match('/^Bearer ([A-Za-z0-9_.-]+)$/i', trim($cabecera), $coincidencias) === 1) {
+            $token = $coincidencias[1];
+        }
+        $usuarioMovil = $servicio->verificarTokenMovil($token);
+        if ($usuarioMovil === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesión móvil inválida o vencida.']);
+            exit;
+        }
+        preg_match('#^/api/pagos/([1-9][0-9]*)/recibo-movil$#D', $ruta, $coincidenciasRuta);
+        (new RecibosMovilControlador($conexion, new ConciliacionRepositorio($conexion)))
+            ->procesar((int) $coincidenciasRuta[1], $usuarioMovil);
+        exit;
+    }
+
+    // HU01 móvil: ruta de solo lectura, independiente de HU01 administrativa.
+    if ($rutaMiVivienda) {
+        (new MiViviendaControlador($conexion, $servicio))->consultar();
+        exit;
+    }
     // HU07: autenticar cada solicitud con el mecanismo web/movil existente.
     if ($rutaHu07) {
         $usuario = AutenticacionSolicitud::usuario($servicio);
@@ -244,186 +241,139 @@ try {
         (new Hu07Controlador(new Hu07Repositorio($conexion), $usuario, $ruta, $metodo))->procesar();
         exit;
     }
-
-if ($rutaContratosAdministrativos) {
-    $usuario = $servicio->verificarTokenWeb(
-        $_COOKIE['alkira_token'] ?? null
-    );
-
-    if ($usuario === null) {
-        http_response_code(401);
-
-        echo json_encode([
-            'mensaje' => 'Sesión administrativa no válida o vencida.'
-        ], JSON_UNESCAPED_UNICODE);
-
-        exit;
-    }
-
-    $repositorioContratos = new ContratosAdministrativosRepositorio(
-        $conexion
-    );
-
-    $servicioContratos = new ContratosAdministrativosServicio(
-        $repositorioContratos,
-        $conexion
-    );
-
-    $controladorContratos = new ContratosAdministrativosControlador(
-        $servicioContratos
-    );
-
-    $controladorContratos->procesar(
-        $metodo,
-        $ruta,
-        $usuario
-    );
-
-    exit;
-}
-
-
-if ($rutaReglasCobro) {
-    $usuario = $servicio->verificarTokenWeb(
-        $_COOKIE['alkira_token'] ?? null
-    );
-
-    if ($usuario === null) {
-        http_response_code(401);
-
-        echo json_encode([
-            'mensaje' => 'Sesión administrativa no válida o vencida.'
-        ], JSON_UNESCAPED_UNICODE);
-
-        exit;
-    }
-
-    $repositorioReglas = new ReglasCobroRepositorio(
-        $conexion
-    );
-
-    $servicioReglas = new ReglasCobroServicio(
-        $repositorioReglas
-    );
-
-    $controladorReglas = new ReglasCobroControlador(
-        $servicioReglas
-    );
-
-    $controladorReglas->procesar(
-        $metodo,
-        $ruta,
-        $usuario
-    );
-
-    exit;
-}
-
-
-if ($rutaSimulacionAdeudos) {
-    // Validar la sesión administrativa existente.
-    $usuario = $servicio->verificarTokenWeb(
-        $_COOKIE['alkira_token'] ?? null
-    );
-
-    if ($usuario === null) {
-        http_response_code(401);
-
-        echo json_encode([
-            'mensaje' => 'Sesión administrativa no válida o vencida.'
-        ], JSON_UNESCAPED_UNICODE);
-
-        exit;
-    }
-
-    // Construir las capas del Módulo 02.
-    $repositorioGeneracion = new GeneracionAdeudosRepositorio(
-        $conexion
-    );
-
-    $servicioGeneracion = new GeneracionAdeudosServicio(
-        $repositorioGeneracion
-    );
-
-    
-    // HU02.3: la generación real permanece
-    // deshabilitada por defecto.
-    //
-    // Solo podrá activarse explícitamente
-    // en el servidor PHP local de desarrollo.
-    
-    // HU02.3: permitir generación real
-    // exclusivamente durante el desarrollo local.
-    //
-    // Por defecto permanece deshabilitada.
-    $generacionHabilitada = false;
-
-    $interruptorActivo = (
-        getenv('ALKIRA_GENERACION_ADEUDOS_HABILITADA') === '1'
-    );
-
-    $servidorPhpLocal = (
-        PHP_SAPI === 'cli-server'
-    );
-
-    $peticionLocal = in_array(
-        $_SERVER['REMOTE_ADDR'] ?? '',
-        ['127.0.0.1', '::1'],
-        true
-    );
-
-    if (
-        $interruptorActivo
-        && $servidorPhpLocal
-        && $peticionLocal
-    ) {
-        $rutaConfiguracion = dirname(__DIR__)
-            . '/config/baseDatos.local.php';
-
-        $configuracionLocal = require $rutaConfiguracion;
-
-        $baseDatosLocal = (
-            is_array($configuracionLocal)
-            && in_array(
-                $configuracionLocal['servidor'] ?? null,
-                ['localhost', '127.0.0.1', '::1'],
-                true
-            )
-            && ($configuracionLocal['baseDatos'] ?? null) === 'alkira'
+    if ($rutaContratosAdministrativos) {
+        $usuario = $servicio->verificarTokenWeb(
+            $_COOKIE['alkira_token'] ?? null
         );
-
-        $generacionHabilitada = $baseDatosLocal;
-    }
-
-
-    $ejecutorGeneracion = null;
-
-    if ($generacionHabilitada) {
-        $ejecutorGeneracion = new EjecucionAdeudosServicio(
-            $repositorioGeneracion,
-            $servicioGeneracion
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode([
+                'mensaje' => 'Sesión administrativa no válida o vencida.'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $repositorioContratos = new ContratosAdministrativosRepositorio(
+            $conexion
         );
+        $servicioContratos = new ContratosAdministrativosServicio(
+            $repositorioContratos,
+            $conexion
+        );
+        $controladorContratos = new ContratosAdministrativosControlador(
+            $servicioContratos
+        );
+        $controladorContratos->procesar(
+            $metodo,
+            $ruta,
+            $usuario
+        );
+        exit;
     }
-
-    $controladorGeneracion = new GeneracionAdeudosControlador(
-        $servicioGeneracion,
-        $ejecutorGeneracion
-    );
-
-
-    // El controlador verifica el rol del administrador.
-    $controladorGeneracion->procesar(
-        $metodo,
-        $ruta,
-        $usuario
-    );
-
-    exit;
-}
-
-
-
-
+    if ($rutaReglasCobro) {
+        $usuario = $servicio->verificarTokenWeb(
+            $_COOKIE['alkira_token'] ?? null
+        );
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode([
+                'mensaje' => 'Sesión administrativa no válida o vencida.'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $repositorioReglas = new ReglasCobroRepositorio(
+            $conexion
+        );
+        $servicioReglas = new ReglasCobroServicio(
+            $repositorioReglas
+        );
+        $controladorReglas = new ReglasCobroControlador(
+            $servicioReglas
+        );
+        $controladorReglas->procesar(
+            $metodo,
+            $ruta,
+            $usuario
+        );
+        exit;
+    }
+    if ($rutaSimulacionAdeudos) {
+        // Validar la sesión administrativa existente.
+        $usuario = $servicio->verificarTokenWeb(
+            $_COOKIE['alkira_token'] ?? null
+        );
+        if ($usuario === null) {
+            http_response_code(401);
+            echo json_encode([
+                'mensaje' => 'Sesión administrativa no válida o vencida.'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        // Construir las capas del Módulo 02.
+        $repositorioGeneracion = new GeneracionAdeudosRepositorio(
+            $conexion
+        );
+        $servicioGeneracion = new GeneracionAdeudosServicio(
+            $repositorioGeneracion
+        );
+        // HU02.3: la generación real permanece
+        // deshabilitada por defecto.
+        //
+        // Solo podrá activarse explícitamente
+        // en el servidor PHP local de desarrollo.
+        // HU02.3: permitir generación real
+        // exclusivamente durante el desarrollo local.
+        //
+        // Por defecto permanece deshabilitada.
+        $generacionHabilitada = false;
+        $interruptorActivo = (
+            getenv('ALKIRA_GENERACION_ADEUDOS_HABILITADA') === '1'
+        );
+        $servidorPhpLocal = (
+            PHP_SAPI === 'cli-server'
+        );
+        $peticionLocal = in_array(
+            $_SERVER['REMOTE_ADDR'] ?? '',
+            ['127.0.0.1', '::1'],
+            true
+        );
+        if (
+            $interruptorActivo
+            && $servidorPhpLocal
+            && $peticionLocal
+        ) {
+            $rutaConfiguracion = dirname(__DIR__)
+                . '/config/baseDatos.local.php';
+            $configuracionLocal = require $rutaConfiguracion;
+            $baseDatosLocal = (
+                is_array($configuracionLocal)
+                && in_array(
+                    $configuracionLocal['servidor'] ?? null,
+                    ['localhost', '127.0.0.1', '::1'],
+                    true
+                )
+                && ($configuracionLocal['baseDatos'] ?? null) === 'alkira'
+            );
+            $generacionHabilitada = $baseDatosLocal;
+        }
+        $ejecutorGeneracion = null;
+        if ($generacionHabilitada) {
+            $ejecutorGeneracion = new EjecucionAdeudosServicio(
+                $repositorioGeneracion,
+                $servicioGeneracion
+            );
+        }
+        $controladorGeneracion = new GeneracionAdeudosControlador(
+            $servicioGeneracion,
+            $ejecutorGeneracion
+        );
+        // El controlador verifica el rol del administrador.
+        $controladorGeneracion->procesar(
+            $metodo,
+            $ruta,
+            $usuario
+        );
+        exit;
+    }
     // HU04.2: procesar conciliación sin modificar el preregistro de HU03.2.
     if ($rutaConciliacion) {
         $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
@@ -435,11 +385,9 @@ if ($rutaSimulacionAdeudos) {
         (new ConciliacionControlador(new ConciliacionRepositorio($conexion)))->procesar($metodo, $ruta, $usuario);
         exit;
     }
-
     // ============================================
     // RUTAS DEL MODULO KDD
     // ============================================
-
     if (in_array($ruta, [
         '/api/kdd/indicadores',
         '/api/kdd/inmuebles',
@@ -448,33 +396,24 @@ if ($rutaSimulacionAdeudos) {
         '/api/kdd/reportes'
     ], true)) {
         $repositorioKdd = new KddRepositorio($conexion);
-
         $servicioKdd = new KddServicio($repositorioKdd);
-
         $controladorKdd = new KddControlador(
             $servicioKdd,
             $servicio
         );
-
         if ($ruta === '/api/kdd/indicadores') {
             $controladorKdd->indicadores();
-
         } elseif ($ruta === '/api/kdd/inmuebles') {
             $controladorKdd->inmuebles();
-
         } elseif ($ruta === '/api/kdd/financiero') {
             $controladorKdd->financieroFiltrado();
-
         } elseif ($ruta === '/api/kdd/operativo') {
             $controladorKdd->operativoFiltrado();
-
         } elseif ($ruta === '/api/kdd/reportes') {
             $controladorKdd->reportes();
         }
-
         exit;
     }
-
     // ============================================
     // RUTAS DE AUTENTICACION
     // ============================================
@@ -496,7 +435,6 @@ if ($rutaSimulacionAdeudos) {
         $controladorInmuebles->procesar($metodo, $ruta);
         exit;
     }
-
     if ($rutaResidentes) {
         $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
         if ($usuario === null) {
@@ -512,7 +450,6 @@ if ($rutaSimulacionAdeudos) {
         (new ResidentesControlador(new ResidentesServicio(new ResidentesRepositorio($conexion))))->procesar($metodo);
         exit;
     }
-
     if ($rutaOrdenesTrabajo) {
         $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
         if ($usuario === null) {
@@ -526,7 +463,6 @@ if ($rutaSimulacionAdeudos) {
         $controladorOrdenes->procesar($metodo, $ruta, $usuario);
         exit;
     }
-
     if ($rutaCierreMantenimiento) {
         $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
         if ($usuario === null) {
@@ -539,7 +475,6 @@ if ($rutaSimulacionAdeudos) {
         ))->procesar($metodo, $ruta, $usuario);
         exit;
     }
-
     if ($rutaTickets) {
         $controladorTickets = new TicketsControlador(
             $servicio,
@@ -548,7 +483,6 @@ if ($rutaSimulacionAdeudos) {
         $controladorTickets->procesar($metodo, $ruta);
         exit;
     }
-
     if ($rutaHu05) {
         $usuario = AutenticacionSolicitud::usuario($servicio);
         if ($usuario === null) {
@@ -563,7 +497,6 @@ if ($rutaSimulacionAdeudos) {
         $controladorIncidencias->procesar($metodo, $ruta);
         exit;
     }
-
     if ($rutaHu10) {
         $usuario = AutenticacionSolicitud::usuario($servicio);
         if ($usuario === null) {
@@ -578,7 +511,6 @@ if ($rutaSimulacionAdeudos) {
         $controladorAccesosQr->procesar($metodo, $ruta);
         exit;
     }
-
     if ($rutaAdeudos) {
         $controladorAdeudos = new AdeudosControlador(
             $servicio,
@@ -587,7 +519,6 @@ if ($rutaSimulacionAdeudos) {
         $controladorAdeudos->consultarPendientes();
         exit;
     }
-
     if ($rutaHistorialContratos) {
         $controladorHistorial = new HistorialContratosControlador(
             $servicio,
@@ -599,15 +530,17 @@ if ($rutaSimulacionAdeudos) {
         $controladorHistorial->procesar($ruta);
         exit;
     }
-
     // HU03.1: endpoints móviles. La identidad proviene del JWT Bearer.
     if (($ruta === '/api/comprobantes/adeudos-movil' && $metodo === 'GET') ||
-        ($ruta === '/api/comprobantes/enviar-movil' && $metodo === 'POST')) {
+        ($ruta === '/api/comprobantes/enviar-movil' && $metodo === 'POST')
+    ) {
         $headerAutorizacion = $_SERVER['HTTP_AUTHORIZATION']
             ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
         $token = null;
-        if (is_string($headerAutorizacion) &&
-            preg_match('/^Bearer ([A-Za-z0-9_.-]+)$/i', trim($headerAutorizacion), $coincidencias) === 1) {
+        if (
+            is_string($headerAutorizacion) &&
+            preg_match('/^Bearer ([A-Za-z0-9_.-]+)$/i', trim($headerAutorizacion), $coincidencias) === 1
+        ) {
             $token = $coincidencias[1];
         }
         $usuario = $servicio->verificarTokenMovil($token);
@@ -626,7 +559,6 @@ if ($rutaSimulacionAdeudos) {
         }
         exit;
     }
-
     // HU03: visualizar PDF, JPG y PNG de forma protegida.
     if ($ruta === '/api/comprobantes/archivo' && $metodo === 'GET') {
         $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
@@ -664,9 +596,9 @@ if ($rutaSimulacionAdeudos) {
             exit;
         }
         // Utilizar solo el nombre del archivo, nunca una ruta del navegador.
-        $nombre = basename(str_replace('\\', '/', $registro['ruta_archivo']));
+        $nombre = basename(str_replace('\\\\', '/', $registro['ruta_archivo']));
         // Solo se admiten nombres seguros y los formatos solicitados.
-        if (!preg_match('/^[a-zA-Z0-9._-]+\.(pdf|jpg|jpeg|png)$/i', $nombre)) {
+        if (!preg_match('/^[a-zA-Z0-9._-]+**\\.**(pdf|jpg|jpeg|png)$/i', $nombre)) {
             http_response_code(404);
             echo json_encode(['mensaje' => 'Archivo no disponible.']);
             exit;
@@ -819,10 +751,8 @@ if ($rutaSimulacionAdeudos) {
         );
         exit;
     }
-
     if ($ruta === '/api/auth/login') {
         $controlador->ingresar();
-
     } elseif ($ruta === '/api/auth/yo') {
         $controlador->sesion();
     } elseif ($ruta === '/api/auth/salir') {
@@ -832,12 +762,9 @@ if ($rutaSimulacionAdeudos) {
     } elseif ($ruta === '/api/auth/yo-movil') {
         $controlador->sesionMovil();
     }
-
 } catch (Throwable $error) {
     error_log($error->getMessage());
-
     http_response_code(500);
-
     echo json_encode([
         'mensaje' => 'No fue posible procesar la solicitud.'
     ]);
