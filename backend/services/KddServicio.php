@@ -185,6 +185,14 @@ public function consultarAnalisisFinancieroFiltrado(
             $periodo
         );
 
+    $senales = $this->repositorio
+        ->obtenerSeguimientoCarteraFiltrado(
+        $idInmueble,
+        $periodo
+    );
+
+    $seguimientoCartera = $this->evaluarSeguimientoCartera($senales);
+
     $patrones = [];
 
     if ((float) $financiero['totalVencido'] > 0) {
@@ -226,6 +234,7 @@ public function consultarAnalisisFinancieroFiltrado(
         'pagos' => $pagos,
         'mantenimiento' => $mantenimiento,
         'alertas' => $alertas,
+        'seguimientoCartera' => $seguimientoCartera,
         'patrones' => $patrones,
 
         'limitePorLista' => 200,
@@ -234,6 +243,102 @@ public function consultarAnalisisFinancieroFiltrado(
             'Alertas descriptivas basadas en reglas; no son predicciones de IA.'
     ];
 }
+
+
+private function evaluarSeguimientoCartera(array $senales): array
+{
+    $conteos = [
+        'alta' => 0,
+        'media' => 0,
+        'baja' => 0,
+        'sinAlerta' => 0,
+        'unidadesProximasAVencer' => 0,
+        'periodosMultiples' => 0,
+        'totalUnidades' => 0
+    ];
+
+    $unidades = [];
+
+    foreach ($senales as $fila) {
+        $vencidas = (int) $fila['cuentasVencidas'];
+        $periodos = (int) $fila['periodosVencidos'];
+        $proximas = (int) $fila['cuentasProximasAVencer'];
+        $dias = max(0, (int) $fila['diasMaximoAtraso']);
+        $vencido = max(0, (float) $fila['saldoVencido']);
+
+        $puntos = 0;
+        $motivos = [];
+
+        if ($vencidas > 0) {
+            $puntos += 35;
+            $motivos[] = $vencidas . ' cuenta(s) vencida(s)';
+        }
+
+        if ($periodos >= 2) {
+            $puntos += 25;
+            $motivos[] = 'Adeudos de ' . $periodos . ' periodos distintos';
+            $conteos['periodosMultiples']++;
+        }
+
+        if ($dias > 30) {
+            $puntos += 20;
+            $motivos[] = 'Atraso de hasta ' . $dias . ' días';
+        }
+
+        if ($vencido >= 5000) {
+            $puntos += 20;
+            $motivos[] = 'Saldo vencido de $5,000 o más';
+        }
+
+        if ($proximas > 0) {
+            $puntos += 20;
+            $motivos[] = $proximas . ' cuenta(s) por vencer en 15 días';
+            $conteos['unidadesProximasAVencer']++;
+        }
+
+        $puntos = min(100, $puntos);
+
+        $prioridad = $puntos >= 70
+            ? 'alta'
+            : ($puntos >= 35
+                ? 'media'
+                : ($puntos > 0 ? 'baja' : 'sinAlerta'));
+
+        $conteos[$prioridad]++;
+
+        $unidades[] = [
+            'idUnidad' => (int) $fila['idUnidad'],
+            'unidad' => (string) $fila['unidad'],
+            'cuentasPendientes' => (int) $fila['cuentasPendientes'],
+            'cuentasVencidas' => $vencidas,
+            'periodosVencidos' => $periodos,
+            'cuentasProximasAVencer' => $proximas,
+            'diasMaximoAtraso' => $dias,
+            'saldoPendiente' => (float) $fila['saldoPendiente'],
+            'saldoVencido' => $vencido,
+            'puntuacion' => $puntos,
+            'prioridad' => $prioridad,
+            'razones' => implode('; ', $motivos) ?: 'Sin señales de alerta'
+        ];
+    }
+
+    usort($unidades, static function (array $a, array $b): int {
+        return ($b['puntuacion'] <=> $a['puntuacion'])
+            ?: ($b['saldoVencido'] <=> $a['saldoVencido']);
+    });
+
+    $conteos['totalUnidades'] = count($unidades);
+
+    return [
+        'resumen' => $conteos,
+        'unidades' => $unidades,
+        'limite' => 200,
+        'metodologia' =>
+            'Evaluación descriptiva de prioridad de seguimiento. '
+            . 'No es un modelo predictivo entrenado.'
+    ];
+}
+
 
     private function validarResultado(
         array $resultado,

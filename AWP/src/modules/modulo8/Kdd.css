@@ -415,4 +415,114 @@
   .kdd-stat-card__value {
     font-size: 1.6rem;
   }
+
+
+/* Semaforo de seguimiento KDD */
+
+.kdd-priority-summary {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.kdd-priority-donut {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin: auto;
+}
+
+.kdd-priority-donut__center {
+  background: white;
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.kdd-priority-donut__center strong {
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.kdd-priority-donut__center span {
+  font-size: 0.72rem;
+  color: #63708a;
+}
+
+.kdd-priority-counters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.kdd-priority-counter {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  padding: 1rem 0.6rem;
+  text-align: center;
+  background: #f3f6fb;
+  border-top: 4px solid;
+}
+
+.kdd-priority-counter__number {
+  font-weight: 800;
+  font-size: 1.7rem;
+}
+
+.kdd-priority-counter__label {
+  color: #63708a;
+  font-size: 0.8rem;
+}
+
+.kdd-priority-ranking {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.kdd-priority-unit {
+  border: 1px solid #e8eef8;
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.kdd-priority-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #edf2f8;
+  overflow: hidden;
+}
+
+.kdd-priority-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.kdd-priority-pill {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+
+@media (max-width: 767px) {
+  .kdd-priority-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .kdd-priority-counters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 }

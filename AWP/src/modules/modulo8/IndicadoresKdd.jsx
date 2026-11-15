@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react'
 import './Kdd.css'
 import TendenciaMensualKdd from './TendenciaMensualKdd.jsx'
@@ -10,172 +11,76 @@ function moneda(valor) {
   }).format(Number(valor ?? 0))
 }
 
-function porcentajeSeguro(valor) {
-  const numero = Number(valor ?? 0)
-  if (!Number.isFinite(numero)) return 0
-  return Math.max(0, Math.min(100, numero))
-}
-
-function porcentaje(parte, total) {
-  const a = Number(parte ?? 0)
-  const b = Number(total ?? 0)
-
-  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= 0) {
-    return 0
-  }
-
-  return (a / b) * 100
-}
-
-function TarjetaResumen({
-  titulo,
-  valor,
-  ayuda,
-  tono = 'primary'
-}) {
+function Tarjeta({ titulo, valor, nota, tono = 'primary' }) {
   return (
     <div className={`kdd-stat-card kdd-stat-card--${tono}`}>
       <p className="kdd-stat-card__label">{titulo}</p>
       <div className="kdd-stat-card__value">{valor}</div>
-      {ayuda && <p className="kdd-stat-card__help">{ayuda}</p>}
+      {nota && <p className="kdd-stat-card__help">{nota}</p>}
     </div>
   )
 }
 
-function BalanceFinanciero({ financiero }) {
-  if (!financiero) return null
+function DistribucionCobranza({ financiero }) {
+  const total = Number(financiero.totalFacturado ?? 0)
+  const aplicado = Number(financiero.totalAplicado ?? 0)
 
-  const totalFacturado = Number(financiero.totalFacturado ?? 0)
-  const totalAplicado = Number(financiero.totalAplicado ?? 0)
-  const totalPendiente = Number(financiero.totalPendiente ?? 0)
-  const totalVencido = Number(financiero.totalVencido ?? 0)
-  const porcentajeAplicado = porcentaje(totalAplicado, totalFacturado)
-  const porcentajePendiente = Math.max(
-    0,
-    100 - porcentajeAplicado
-  )
-  const porcentajeMorosidad = porcentajeSeguro(
-    financiero.porcentajeMorosidad
-  )
-
-  const donutStyle = {
-    background:
-      totalFacturado > 0
-        ? `conic-gradient(
-            #198754 0% ${porcentajeAplicado}%,
-            #f0ad00 ${porcentajeAplicado}% 100%
-          )`
-        : '#edf2f8'
-  }
+  const porcentaje = total > 0
+    ? Math.max(0, Math.min(100, aplicado / total * 100))
+    : 0
 
   return (
-    <section className="kdd-section-card p-4">
-      <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-        <div>
-          <h3 className="h6 fw-bold mb-1">
-            Resumen visual del periodo
-          </h3>
+    <div className="kdd-section-card p-4">
+      <h3 className="h6 fw-bold mb-1">
+        ¿Cuánto se ha cobrado?
+      </h3>
+
+      <p className="text-secondary small mb-3">
+        Distribución del importe facturado en los filtros seleccionados.
+      </p>
+
+      <div className="kdd-balance-layout">
+        <div className="kdd-donut-wrap">
+          <div
+            className="kdd-donut"
+            style={{
+              background: total > 0
+                ? `conic-gradient(#198754 0% ${porcentaje}%, #f0ad00 ${porcentaje}% 100%)`
+                : '#edf2f8'
+            }}
+            role="img"
+            aria-label={`${porcentaje.toFixed(1)} por ciento aplicado`}
+          >
+            <div className="kdd-donut__content">
+              <span className="kdd-donut__percent">
+                {porcentaje.toFixed(1)}%
+              </span>
+              <span className="kdd-donut__label">
+                Aplicado
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="kdd-legend">
+          <div className="kdd-legend__item">
+            <span className="kdd-legend__dot kdd-legend__dot--success" />
+            <span>Aplicado</span>
+            <strong>{moneda(financiero.totalAplicado)}</strong>
+          </div>
+
+          <div className="kdd-legend__item">
+            <span className="kdd-legend__dot kdd-legend__dot--warning" />
+            <span>Pendiente</span>
+            <strong>{moneda(financiero.totalPendiente)}</strong>
+          </div>
+
           <p className="text-secondary small mb-0">
-            Aquí se entiende rápido cuánto se cobró y cuánto sigue pendiente.
+            El pendiente incluye saldos que aún no han vencido.
           </p>
         </div>
-
-        <div className="kdd-inline-chips">
-          <span className="kdd-chip">Facturado: {moneda(totalFacturado)}</span>
-          <span className="kdd-chip">Pendiente: {moneda(totalPendiente)}</span>
-          <span className="kdd-chip">Vencido: {moneda(totalVencido)}</span>
-        </div>
       </div>
-
-      <div className="kdd-chart-grid">
-        <div className="kdd-chart-card">
-          <div className="kdd-chart-card__title">
-            Distribución del total facturado
-          </div>
-          <div className="kdd-chart-card__subtitle">
-            La dona compara lo aplicado contra lo que sigue pendiente.
-          </div>
-
-          <div className="kdd-balance-layout">
-            <div className="kdd-donut-wrap">
-              <div className="kdd-donut" style={donutStyle}>
-                <div className="kdd-donut__content">
-                  <span className="kdd-donut__percent">
-                    {porcentajeAplicado.toFixed(1)}%
-                  </span>
-                  <span className="kdd-donut__label">Aplicado</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="kdd-legend">
-              <div className="kdd-legend__item">
-                <span className="kdd-legend__dot kdd-legend__dot--success" />
-                <span>Aplicado</span>
-                <strong>{moneda(totalAplicado)}</strong>
-              </div>
-
-              <div className="kdd-legend__item">
-                <span className="kdd-legend__dot kdd-legend__dot--warning" />
-                <span>Pendiente</span>
-                <strong>{moneda(totalPendiente)}</strong>
-              </div>
-
-              <div className="kdd-legend__item">
-                <span className="kdd-legend__dot kdd-legend__dot--danger" />
-                <span>Vencido</span>
-                <strong>{moneda(totalVencido)}</strong>
-              </div>
-
-              <div className="mt-3 small text-secondary">
-                <strong>{porcentajePendiente.toFixed(1)}%</strong>{' '}
-                del total facturado sigue sin aplicarse.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="kdd-chart-card">
-          <div className="kdd-chart-card__title">
-            Medidor de morosidad
-          </div>
-          <div className="kdd-chart-card__subtitle">
-            Este porcentaje muestra qué parte de lo facturado está vencida.
-          </div>
-
-          <div className="display-6 fw-bold mb-2">
-            {porcentajeMorosidad.toFixed(2)}%
-          </div>
-
-          <div className="kdd-meter">
-            <div className="kdd-meter__track">
-              <div
-                className="kdd-meter__fill"
-                style={{ width: `${porcentajeMorosidad}%` }}
-              />
-            </div>
-
-            <div className="kdd-meter__labels">
-              <span>Bajo</span>
-              <span>Medio</span>
-              <span>Alto</span>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <p className="mb-1 small text-secondary">
-              Interpretación rápida
-            </p>
-
-            <ul className="small mb-0 text-secondary">
-              <li>Si baja este valor, la cobranza mejoró.</li>
-              <li>Si sube, hay más saldo vencido acumulado.</li>
-              <li>En octubre debería verse mejor que en septiembre.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
+    </div>
   )
 }
 
@@ -199,9 +104,19 @@ async function consultarApi(ruta, senal) {
   return respuesta.json()
 }
 
+const SECCIONES = [
+  { clave: 'resumen', texto: 'Resumen' },
+  { clave: 'cobranza', texto: 'Cobranza' },
+  { clave: 'mantenimiento', texto: 'Mantenimiento' },
+  { clave: 'reportes', texto: 'Reportes' }
+]
+
 function IndicadoresKdd() {
+  const [vista, setVista] = useState('resumen')
+
   const [generales, setGenerales] = useState(null)
   const [inmuebles, setInmuebles] = useState([])
+
   const [idInmueble, setIdInmueble] = useState('')
   const [periodo, setPeriodo] = useState('')
   const [filtrados, setFiltrados] = useState(null)
@@ -217,17 +132,16 @@ function IndicadoresKdd() {
 
     async function cargar() {
       try {
-        const [respuestaGeneral, respuestaInmuebles] =
-          await Promise.all([
-            consultarApi('/api/kdd/indicadores', controlador.signal),
-            consultarApi('/api/kdd/inmuebles', controlador.signal)
-          ])
+        const [resumen, lista] = await Promise.all([
+          consultarApi('/api/kdd/indicadores', controlador.signal),
+          consultarApi('/api/kdd/inmuebles', controlador.signal)
+        ])
 
         if (
-          !respuestaGeneral.financiero ||
-          !respuestaGeneral.operativo ||
-          !Array.isArray(respuestaGeneral.tendenciaMensual) ||
-          !Array.isArray(respuestaInmuebles.inmuebles)
+          !resumen.financiero ||
+          !resumen.operativo ||
+          !Array.isArray(resumen.tendenciaMensual) ||
+          !Array.isArray(lista.inmuebles)
         ) {
           throw new Error(
             'La API KDD devolvió información incompleta.'
@@ -235,8 +149,8 @@ function IndicadoresKdd() {
         }
 
         if (!controlador.signal.aborted) {
-          setGenerales(respuestaGeneral)
-          setInmuebles(respuestaInmuebles.inmuebles)
+          setGenerales(resumen)
+          setInmuebles(lista.inmuebles)
         }
       } catch (error) {
         if (!controlador.signal.aborted) {
@@ -250,13 +164,14 @@ function IndicadoresKdd() {
     }
 
     cargar()
+
     return () => controlador.abort()
   }, [])
 
   const filtrosActivos = Boolean(idInmueble || periodo)
 
   useEffect(() => {
-    if (!idInmueble && !periodo) return
+    if (!filtrosActivos) return
 
     const controlador = new AbortController()
 
@@ -274,12 +189,18 @@ function IndicadoresKdd() {
         parametros.set('periodo', periodo)
       }
 
-      const consulta = parametros.toString()
-
       try {
+        const consulta = parametros.toString()
+
         const [finanzas, operaciones] = await Promise.all([
-          consultarApi(`/api/kdd/financiero?${consulta}`, controlador.signal),
-          consultarApi(`/api/kdd/operativo?${consulta}`, controlador.signal)
+          consultarApi(
+            `/api/kdd/financiero?${consulta}`,
+            controlador.signal
+          ),
+          consultarApi(
+            `/api/kdd/operativo?${consulta}`,
+            controlador.signal
+          )
         ])
 
         if (
@@ -311,20 +232,9 @@ function IndicadoresKdd() {
     }
 
     cargarFiltros()
+
     return () => controlador.abort()
-  }, [idInmueble, periodo])
-
-  function actualizarInmueble(valor) {
-    setFiltrados(null)
-    setErrorFiltros('')
-    setIdInmueble(valor)
-  }
-
-  function actualizarPeriodo(valor) {
-    setFiltrados(null)
-    setErrorFiltros('')
-    setPeriodo(valor)
-  }
+  }, [idInmueble, periodo, filtrosActivos])
 
   function limpiarFiltros() {
     setIdInmueble('')
@@ -337,7 +247,7 @@ function IndicadoresKdd() {
   if (cargandoInicial) {
     return (
       <div className="alert alert-secondary">
-        Cargando indicadores KDD...
+        Cargando KDD...
       </div>
     )
   }
@@ -353,126 +263,119 @@ function IndicadoresKdd() {
   if (!generales) return null
 
   const datos = filtrosActivos ? filtrados : generales
+
   const financiero = datos?.financiero
   const operativo = datos?.operativo
   const tendencia = datos?.tendenciaMensual ?? []
 
-  const ocupado = filtrosActivos && (cargandoFiltros || !filtrados)
+  const ocupado = filtrosActivos &&
+    (cargandoFiltros || !filtrados)
+
+  const totalTickets = Number(operativo?.totalTickets ?? 0)
+  const cerrados = Number(operativo?.ticketsCerrados ?? 0)
+
+  const porcentajeCierre = totalTickets > 0
+    ? Math.max(0, Math.min(100, cerrados / totalTickets * 100))
+    : 0
 
   return (
     <div className="container-fluid px-0 kdd-shell">
-      <div className="card kdd-hero">
-        <div className="card-body p-4 p-lg-5">
-          <div className="d-flex flex-wrap justify-content-between gap-3 align-items-start">
-            <div>
-              <h2 className="h3 fw-bold mb-2">
-                Analítica e Historiales KDD
-              </h2>
-              <p className="kdd-hero__subtitle">
-                Tablero más claro para leer cobranza, morosidad, mantenimiento e historiales.
-              </p>
-            </div>
 
-            <div className="kdd-inline-chips">
-              <span className="kdd-chip">Módulo 8</span>
-              <span className="kdd-chip">Datos desde MySQL</span>
-              <span className="kdd-chip">CSV + PDF</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <header className="kdd-hero p-4">
+        <h2 className="h4 fw-bold mb-1">
+          Analítica KDD
+        </h2>
 
-      <div className="kdd-guide-grid">
-        <div className="kdd-guide-card">
-          <span className="kdd-guide-card__tag">Paso 1</span>
-          <h3 className="h6 fw-bold">Filtra lo que quieres analizar</h3>
-          <p className="text-secondary small mb-0">
-            Elige inmueble y/o periodo. Todo el tablero cambia con esos filtros.
-          </p>
-        </div>
+        <p className="kdd-hero__subtitle">
+          Revisa lo importante y consulta los detalles cuando los necesites.
+        </p>
+      </header>
 
-        <div className="kdd-guide-card">
-          <span className="kdd-guide-card__tag">Paso 2</span>
-          <h3 className="h6 fw-bold">Lee los indicadores y gráficas</h3>
-          <p className="text-secondary small mb-0">
-            Primero revisa montos, luego la tendencia mensual y después mantenimiento.
-          </p>
-        </div>
+      <nav
+        className="d-flex flex-wrap gap-2"
+        aria-label="Secciones de analítica"
+      >
+        {SECCIONES.map((seccion) => (
+          <button
+            key={seccion.clave}
+            type="button"
+            className={`btn ${
+              vista === seccion.clave
+                ? 'btn-primary'
+                : 'btn-outline-secondary'
+            }`}
+            aria-pressed={vista === seccion.clave}
+            onClick={() => setVista(seccion.clave)}
+          >
+            {seccion.texto}
+          </button>
+        ))}
+      </nav>
 
-        <div className="kdd-guide-card">
-          <span className="kdd-guide-card__tag">Paso 59 aclarado</span>
-          <h3 className="h6 fw-bold">Qué revisar abajo</h3>
-          <p className="text-secondary small mb-0">
-            Baja a “Historiales, patrones y reportes”, verifica tablas, alertas, CSV y PDF.
-          </p>
-        </div>
-      </div>
+      <div className="kdd-section-card p-3">
+        <div className="row g-3 align-items-end">
 
-      <div className="kdd-section-card">
-        <div className="card-body p-4">
-          <h3 className="h6 fw-bold mb-3">
-            Filtros del análisis
-          </h3>
+          <div className="col-12 col-md-5">
+            <label
+              className="form-label small"
+              htmlFor="filtroInmuebleKdd"
+            >
+              Inmueble
+            </label>
 
-          <div className="row g-3 align-items-end">
-            <div className="col-12 col-md-5">
-              <label
-                htmlFor="filtroInmuebleKdd"
-                className="form-label"
-              >
-                Inmueble
-              </label>
+            <select
+              id="filtroInmuebleKdd"
+              className="form-select"
+              value={idInmueble}
+              onChange={(evento) => {
+                setFiltrados(null)
+                setIdInmueble(evento.target.value)
+              }}
+            >
+              <option value="">
+                Todos los inmuebles
+              </option>
 
-              <select
-                id="filtroInmuebleKdd"
-                className="form-select"
-                value={idInmueble}
-                onChange={(e) => actualizarInmueble(e.target.value)}
-              >
-                <option value="">Todos los inmuebles</option>
-
-                {inmuebles.map((inmueble) => (
-                  <option
-                    key={inmueble.idInmueble}
-                    value={inmueble.idInmueble}
-                  >
-                    {inmueble.nombreInmueble}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="col-12 col-md-4">
-              <label
-                htmlFor="filtroPeriodoKdd"
-                className="form-label"
-              >
-                Periodo
-              </label>
-
-              <input
-                id="filtroPeriodoKdd"
-                type="month"
-                className="form-control"
-                value={periodo}
-                onChange={(e) => actualizarPeriodo(e.target.value)}
-              />
-            </div>
-
-            <div className="col-12 col-md-3">
-              <button
-                type="button"
-                className="btn btn-outline-secondary w-100"
-                onClick={limpiarFiltros}
-              >
-                Limpiar filtros
-              </button>
-            </div>
+              {inmuebles.map((inmueble) => (
+                <option
+                  key={inmueble.idInmueble}
+                  value={inmueble.idInmueble}
+                >
+                  {inmueble.nombreInmueble}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <p className="kdd-filter-note mt-3 mb-0">
-            Los filtros se aplican a indicadores, gráficas, historiales, alertas y exportaciones.
-          </p>
+          <div className="col-12 col-md-4">
+            <label
+              className="form-label small"
+              htmlFor="filtroPeriodoKdd"
+            >
+              Mes de facturación
+            </label>
+
+            <input
+              id="filtroPeriodoKdd"
+              type="month"
+              className="form-control"
+              value={periodo}
+              onChange={(evento) => {
+                setFiltrados(null)
+                setPeriodo(evento.target.value)
+              }}
+            />
+          </div>
+
+          <div className="col-12 col-md-3">
+            <button
+              type="button"
+              className="btn btn-outline-secondary w-100"
+              onClick={limpiarFiltros}
+            >
+              Limpiar filtros
+            </button>
+          </div>
         </div>
       </div>
 
@@ -483,137 +386,198 @@ function IndicadoresKdd() {
       )}
 
       {ocupado && !errorFiltros && (
-        <div className="alert alert-secondary">
+        <div className="alert alert-secondary" role="status">
           Aplicando filtros...
         </div>
       )}
 
-      {!ocupado && !errorFiltros && (
-        <>
-          {financiero && (
-            <>
-              <section>
-                <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                  <h3 className="h5 fw-bold mb-0">
-                    Indicadores financieros
-                  </h3>
-                  <span className="text-secondary small">
-                    Resumen general de cobranza y morosidad.
-                  </span>
-                </div>
-
-                <div className="kdd-summary-grid">
-                  <TarjetaResumen
-                    titulo="Total facturado"
-                    valor={moneda(financiero.totalFacturado)}
-                    ayuda="Monto total generado en los estados de cuenta."
-                    tono="primary"
-                  />
-                  <TarjetaResumen
-                    titulo="Total aplicado"
-                    valor={moneda(financiero.totalAplicado)}
-                    ayuda="Monto que ya quedó cubierto o aplicado."
-                    tono="success"
-                  />
-                  <TarjetaResumen
-                    titulo="Saldo pendiente"
-                    valor={moneda(financiero.totalPendiente)}
-                    ayuda="Monto que aún falta por cubrir."
-                    tono="warning"
-                  />
-                  <TarjetaResumen
-                    titulo="Saldo vencido"
-                    valor={moneda(financiero.totalVencido)}
-                    ayuda="Parte pendiente que ya está vencida."
-                    tono="danger"
-                  />
-                  <TarjetaResumen
-                    titulo="Morosidad sobre facturación"
-                    valor={`${porcentajeSeguro(financiero.porcentajeMorosidad).toFixed(2)}%`}
-                    ayuda="Porcentaje del total facturado que está vencido."
-                    tono="info"
-                  />
-                  <TarjetaResumen
-                    titulo="Cuentas vencidas"
-                    valor={String(financiero.cuentasVencidas ?? 0)}
-                    ayuda="Número de estados de cuenta con atraso."
-                    tono="warning"
-                  />
-                </div>
-              </section>
-
-              <BalanceFinanciero financiero={financiero} />
-            </>
-          )}
-
-          <TendenciaMensualKdd registros={tendencia} />
-
-          {operativo && (
-            <section>
-              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                <h3 className="h5 fw-bold mb-0">
-                  Indicadores de mantenimiento
-                </h3>
-                <span className="text-secondary small">
-                  Estado de incidencias, tickets y tiempos de resolución.
-                </span>
-              </div>
+      {!ocupado &&
+        !errorFiltros &&
+        vista === 'resumen' &&
+        financiero &&
+        operativo && (
+          <>
+            <section aria-label="Indicadores principales">
+              <h3 className="h6 fw-bold mb-3">
+                Situación actual
+              </h3>
 
               <div className="kdd-summary-grid">
-                <TarjetaResumen
-                  titulo="Incidencias registradas"
-                  valor={String(operativo.totalIncidencias ?? 0)}
-                  ayuda="Incidencias detectadas en el filtro actual."
-                  tono="primary"
-                />
-                <TarjetaResumen
-                  titulo="Incidencias urgentes"
-                  valor={String(operativo.incidenciasUrgentes ?? 0)}
-                  ayuda="Reportes marcados con alta urgencia."
+                <Tarjeta
+                  titulo="Saldo vencido"
+                  valor={moneda(financiero.totalVencido)}
                   tono="danger"
                 />
-                <TarjetaResumen
-                  titulo="Tickets registrados"
-                  valor={String(operativo.totalTickets ?? 0)}
-                  ayuda="Total de tickets creados."
-                  tono="info"
-                />
-                <TarjetaResumen
-                  titulo="Tickets abiertos"
-                  valor={String(operativo.ticketsAbiertos ?? 0)}
-                  ayuda="Tickets todavía en proceso o asignados."
+
+                <Tarjeta
+                  titulo="Morosidad"
+                  valor={`${Number(
+                    financiero.porcentajeMorosidad ?? 0
+                  ).toFixed(2)}%`}
                   tono="warning"
                 />
-                <TarjetaResumen
-                  titulo="Tickets cerrados"
-                  valor={String(operativo.ticketsCerrados ?? 0)}
-                  ayuda="Tickets ya concluidos."
+
+                <Tarjeta
+                  titulo="Total aplicado"
+                  valor={moneda(financiero.totalAplicado)}
                   tono="success"
                 />
-                <TarjetaResumen
-                  titulo="Promedio de resolución"
-                  valor={
-                    operativo.promedioHorasResolucion === null
-                      ? 'Sin datos'
-                      : `${Number(operativo.promedioHorasResolucion).toFixed(2)} horas`
-                  }
-                  ayuda="Tiempo promedio para cerrar tickets."
+
+                <Tarjeta
+                  titulo="Tickets abiertos"
+                  valor={String(operativo.ticketsAbiertos ?? 0)}
                   tono="primary"
                 />
               </div>
             </section>
-          )}
-        </>
+
+            <TendenciaMensualKdd registros={tendencia} />
+
+            <p className="text-secondary small mb-0">
+              Para ver unidades con atrasos, entra a{' '}
+              <strong>Reportes</strong>. Para consultar los
+              importes completos, entra a{' '}
+              <strong>Cobranza</strong>.
+            </p>
+          </>
+        )}
+
+      {!ocupado &&
+        !errorFiltros &&
+        vista === 'cobranza' &&
+        financiero && (
+          <>
+            <h3 className="h6 fw-bold mb-0">
+              Detalle de cobranza
+            </h3>
+
+            <div className="kdd-summary-grid">
+              <Tarjeta
+                titulo="Facturado"
+                valor={moneda(financiero.totalFacturado)}
+              />
+
+              <Tarjeta
+                titulo="Aplicado"
+                valor={moneda(financiero.totalAplicado)}
+                tono="success"
+              />
+
+              <Tarjeta
+                titulo="Pendiente"
+                valor={moneda(financiero.totalPendiente)}
+                tono="warning"
+              />
+
+              <Tarjeta
+                titulo="Vencido"
+                valor={moneda(financiero.totalVencido)}
+                tono="danger"
+              />
+            </div>
+
+            <DistribucionCobranza financiero={financiero} />
+
+            <p className="text-secondary small mb-0">
+              Las unidades con prioridad de seguimiento
+              están en <strong>Reportes</strong>.
+            </p>
+          </>
+        )}
+
+      {!ocupado &&
+        !errorFiltros &&
+        vista === 'mantenimiento' &&
+        operativo && (
+          <>
+            <h3 className="h6 fw-bold mb-0">
+              Estado de mantenimiento
+            </h3>
+
+            <div className="kdd-summary-grid">
+              <Tarjeta
+                titulo="Tickets abiertos"
+                valor={String(operativo.ticketsAbiertos ?? 0)}
+                tono="warning"
+              />
+
+              <Tarjeta
+                titulo="Tickets cerrados"
+                valor={String(operativo.ticketsCerrados ?? 0)}
+                tono="success"
+              />
+
+              <Tarjeta
+                titulo="Tiempo promedio de resolución"
+                valor={
+                  operativo.promedioHorasResolucion == null
+                    ? 'Sin datos'
+                    : `${Number(
+                        operativo.promedioHorasResolucion
+                      ).toFixed(2)} h`
+                }
+                tono="primary"
+              />
+            </div>
+
+            <div className="kdd-section-card p-4">
+              <div className="d-flex justify-content-between mb-2">
+                <strong className="small">
+                  Tickets cerrados
+                </strong>
+
+                <span className="small">
+                  {cerrados} de {totalTickets}
+                </span>
+              </div>
+
+              <div className="progress" style={{ height: '14px' }}>
+                <div
+                  className="progress-bar bg-success"
+                  role="progressbar"
+                  style={{
+                    width: `${porcentajeCierre}%`
+                  }}
+                  aria-valuenow={porcentajeCierre}
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-label="Porcentaje de tickets cerrados"
+                />
+              </div>
+
+              <details className="mt-3">
+                <summary
+                  className="small fw-semibold"
+                  style={{ cursor: 'pointer' }}
+                >
+                  Ver más indicadores de mantenimiento
+                </summary>
+
+                <p className="small text-secondary mt-2 mb-0">
+                  Incidencias: {operativo.totalIncidencias ?? 0}
+                  {' · '}
+                  Urgentes: {operativo.incidenciasUrgentes ?? 0}
+                  {' · '}
+                  Tickets registrados: {operativo.totalTickets ?? 0}
+                </p>
+              </details>
+            </div>
+          </>
+        )}
+
+      {vista === 'reportes' && (
+        <HistorialesKdd
+          idInmueble={idInmueble}
+          periodo={periodo}
+        />
       )}
 
-      <HistorialesKdd
-        idInmueble={idInmueble}
-        periodo={periodo}
-      />
+      <p className="text-secondary small mb-0">
+        Los saldos se agrupan por periodo de facturación.
+        Las prioridades de cobranza son reglas descriptivas,
+        no predicciones de IA.
+      </p>
 
-      <div className="alert alert-info small mt-1">
-        Información de prueba para el proyecto universitario. Las alertas mostradas son descriptivas y se basan en reglas, no en un modelo predictivo entrenado.
-      </div>
     </div>
   )
 }

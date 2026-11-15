@@ -213,6 +213,129 @@ public function obtenerAlertasMorosidadFiltradas(
     );
 }
 
+
+public function obtenerSeguimientoCarteraFiltrado(
+    ?int $idInmueble,
+    ?string $periodo
+): array {
+    $sql = <<<'SQL'
+WITH RECURSIVE inmueblesRelacionados AS (
+    SELECT id_inmueble
+    FROM inmuebles
+    WHERE id_inmueble = ?
+
+    UNION ALL
+
+    SELECT hijo.id_inmueble
+    FROM inmuebles hijo
+    INNER JOIN inmueblesRelacionados padre
+        ON hijo.id_inmueble_padre = padre.id_inmueble
+)
+SELECT
+    pu.id_unidad AS idUnidad,
+    pu.numero_unidad AS unidad,
+
+    COUNT(*) AS cuentasRegistradas,
+
+    SUM(
+        CASE WHEN vc.monto_pendiente > 0
+        THEN 1 ELSE 0 END
+    ) AS cuentasPendientes,
+
+    SUM(
+        CASE WHEN vc.monto_vencido > 0
+        THEN 1 ELSE 0 END
+    ) AS cuentasVencidas,
+
+    COUNT(DISTINCT CASE
+        WHEN vc.monto_vencido > 0
+        THEN vc.periodo
+        ELSE NULL
+    END) AS periodosVencidos,
+
+    SUM(
+        CASE
+            WHEN vc.monto_pendiente > 0
+             AND vc.fecha_limite_pago >= CURDATE()
+             AND vc.fecha_limite_pago <=
+                 DATE_ADD(CURDATE(), INTERVAL 15 DAY)
+            THEN 1 ELSE 0
+        END
+    ) AS cuentasProximasAVencer,
+
+    ROUND(SUM(vc.monto_pendiente), 2) AS saldoPendiente,
+    ROUND(SUM(vc.monto_vencido), 2) AS saldoVencido,
+
+    COALESCE(MAX(
+        CASE
+            WHEN vc.monto_vencido > 0
+            THEN DATEDIFF(CURDATE(), vc.fecha_limite_pago)
+            ELSE NULL
+        END
+    ), 0) AS diasMaximoAtraso
+
+FROM view_kdd_cartera vc
+
+INNER JOIN estados_cuenta ec
+    ON vc.id_estado_cuenta = ec.id_estado_cuenta
+
+INNER JOIN contratos c
+    ON ec.id_contrato = c.id_contrato
+
+INNER JOIN propiedades_unidades pu
+    ON c.id_unidad = pu.id_unidad
+
+WHERE (
+    ? IS NULL
+    OR vc.id_inmueble IN (
+        SELECT id_inmueble
+        FROM inmueblesRelacionados
+    )
+)
+
+AND (
+    ? IS NULL
+    OR vc.periodo = ?
+)
+
+GROUP BY pu.id_unidad, pu.numero_unidad
+
+HAVING SUM(vc.monto_pendiente) > 0
+
+ORDER BY saldoVencido DESC, saldoPendiente DESC
+
+LIMIT 200
+SQL;
+
+    $sentencia = $this->conexion->prepare($sql);
+
+    $valores = [
+        $idInmueble,
+        $idInmueble,
+        $periodo,
+        $periodo
+    ];
+
+    foreach ($valores as $indice => $valor) {
+        $sentencia->bindValue(
+            $indice + 1,
+            $valor,
+            $valor === null
+                ? PDO::PARAM_NULL
+                : (is_int($valor) ? PDO::PARAM_INT : PDO::PARAM_STR)
+        );
+    }
+
+    $sentencia->execute();
+
+    try {
+        return $sentencia->fetchAll(PDO::FETCH_ASSOC);
+    } finally {
+        $sentencia->closeCursor();
+    }
+}
+
+
 private function consultarListaKdd(
     string $procedimiento,
     ?int $idInmueble,

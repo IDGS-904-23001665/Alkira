@@ -1,65 +1,84 @@
+
 import { useEffect, useState } from 'react'
+import SeguimientoCarteraKdd from './SeguimientoCarteraKdd.jsx'
 
-const COLUMNAS_PAGOS = [
-  { campo: 'idPago', titulo: 'Pago' },
-  { campo: 'unidad', titulo: 'Unidad' },
-  { campo: 'periodo', titulo: 'Periodo' },
-  { campo: 'fechaPago', titulo: 'Fecha' },
-  { campo: 'monto', titulo: 'Monto' },
-  { campo: 'metodoPago', titulo: 'Método' },
-  { campo: 'estadoPago', titulo: 'Estado' }
+const PAGOS = [
+  ['idPago', 'Pago'],
+  ['unidad', 'Unidad'],
+  ['periodo', 'Periodo'],
+  ['fechaPago', 'Fecha'],
+  ['monto', 'Monto'],
+  ['metodoPago', 'Método'],
+  ['estadoPago', 'Estado']
 ]
 
-const COLUMNAS_MANTENIMIENTO = [
-  { campo: 'idIncidencia', titulo: 'Incidencia' },
-  { campo: 'idTicket', titulo: 'Ticket' },
-  { campo: 'titulo', titulo: 'Descripción' },
-  { campo: 'categoria', titulo: 'Categoría' },
-  { campo: 'urgencia', titulo: 'Urgencia' },
-  { campo: 'fechaReporte', titulo: 'Reportada' },
-  { campo: 'estadoTicket', titulo: 'Ticket: estado' },
-  { campo: 'horasResolucion', titulo: 'Horas de resolución' }
+const MANTENIMIENTO = [
+  ['idIncidencia', 'Incidencia'],
+  ['idTicket', 'Ticket'],
+  ['titulo', 'Descripción'],
+  ['categoria', 'Categoría'],
+  ['urgencia', 'Urgencia'],
+  ['fechaReporte', 'Reportada'],
+  ['estadoTicket', 'Estado del ticket'],
+  ['horasResolucion', 'Horas de resolución']
 ]
 
-const COLUMNAS_ALERTAS = [
-  { campo: 'unidad', titulo: 'Unidad' },
-  { campo: 'cuentasRegistradas', titulo: 'Cuentas' },
-  { campo: 'cuentasVencidas', titulo: 'Vencidas' },
-  { campo: 'saldoVencido', titulo: 'Saldo vencido' },
-  { campo: 'nivelAlerta', titulo: 'Alerta' }
+const ALERTAS = [
+  ['unidad', 'Unidad'],
+  ['cuentasRegistradas', 'Cuentas'],
+  ['cuentasVencidas', 'Vencidas'],
+  ['saldoVencido', 'Saldo vencido'],
+  ['nivelAlerta', 'Alerta']
 ]
 
-function textoCelda(valor) {
-  return valor === null || valor === undefined || valor === ''
+const SEGUIMIENTO = [
+  ['unidad', 'Unidad'],
+  ['prioridad', 'Prioridad'],
+  ['puntuacion', 'Puntos'],
+  ['cuentasVencidas', 'Cuentas vencidas'],
+  ['periodosVencidos', 'Periodos vencidos'],
+  ['cuentasProximasAVencer', 'Próximas a vencer'],
+  ['saldoPendiente', 'Saldo pendiente'],
+  ['saldoVencido', 'Saldo vencido'],
+  ['razones', 'Señales detectadas']
+]
+
+function texto(valor) {
+  return valor === null ||
+    valor === undefined ||
+    valor === ''
     ? '—'
     : String(valor)
 }
 
 function descargarCsv(nombre, columnas, filas) {
-  const sanear = (valor) => {
-    const texto = String(valor ?? '')
-    const seguro = /^\s*[=+\-@]/.test(texto)
-      ? `'${texto}`
-      : texto
+  const celda = (valor) => {
+    const original = String(valor ?? '')
+
+    const seguro = /^\s*[=+\-@]/.test(original)
+      ? `'${original}`
+      : original
 
     return `"${seguro.replaceAll('"', '""')}"`
   }
 
   const lineas = [
-    columnas.map((columna) => sanear(columna.titulo)).join(','),
+    columnas.map(([, titulo]) => celda(titulo)).join(','),
     ...filas.map((fila) =>
-      columnas.map((columna) =>
-        sanear(fila[columna.campo])
+      columnas.map(([campo]) =>
+        celda(fila[campo])
       ).join(',')
     )
   ]
 
-  const archivo = new Blob(
+  const blob = new Blob(
     ['\uFEFF' + lineas.join('\r\n')],
-    { type: 'text/csv;charset=utf-8' }
+    {
+      type: 'text/csv;charset=utf-8'
+    }
   )
 
-  const url = URL.createObjectURL(archivo)
+  const url = URL.createObjectURL(blob)
   const enlace = document.createElement('a')
 
   enlace.href = url
@@ -73,97 +92,143 @@ function descargarCsv(nombre, columnas, filas) {
 }
 
 function escaparHtml(valor) {
-  return textoCelda(valor).replace(/[&<>"']/g, (caracter) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  })[caracter])
+  return texto(valor).replace(
+    /[&<>"']/g,
+    (c) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[c]
+  )
 }
 
-function imprimirInforme(reporte, periodo, idInmueble) {
+function imprimirInforme(reporte, periodo, inmueble) {
   const tabla = (titulo, columnas, filas) => `
     <h2>${escaparHtml(titulo)}</h2>
+
     <table>
       <thead>
         <tr>
-          ${columnas.map((c) => `<th>${escaparHtml(c.titulo)}</th>`).join('')}
+          ${columnas.map(([, tituloColumna]) =>
+            `<th>${escaparHtml(tituloColumna)}</th>`
+          ).join('')}
         </tr>
       </thead>
+
       <tbody>
         ${filas.map((fila) => `
           <tr>
-            ${columnas.map((c) => `<td>${escaparHtml(fila[c.campo])}</td>`).join('')}
+            ${columnas.map(([campo]) =>
+              `<td>${escaparHtml(fila[campo])}</td>`
+            ).join('')}
           </tr>
         `).join('')}
       </tbody>
     </table>
   `
 
-  const patrones = reporte.patrones.map((p) => `
+  const hallazgos = reporte.patrones.map((patron) => `
     <li>
-      <b>${escaparHtml(p.titulo)}:</b>
-      ${escaparHtml(p.detalle)}
+      <strong>${escaparHtml(patron.titulo)}</strong>:
+      ${escaparHtml(patron.detalle)}
     </li>
   `).join('')
 
-  const contenido = `
+  const html = `
     <!doctype html>
     <html lang="es">
-    <head>
-      <meta charset="utf-8" />
-      <title>Informe KDD - ALKIRA</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          padding: 22px;
-          color: #17223b;
-        }
-        h1 { font-size: 22px; }
-        h2 { font-size: 16px; margin-top: 25px; }
-        table {
-          border-collapse: collapse;
-          width: 100%;
-          font-size: 11px;
-        }
-        th, td {
-          border: 1px solid #bbb;
-          padding: 6px;
-          text-align: left;
-          overflow-wrap: anywhere;
-        }
-        th { background: #eee; }
-        small { color: #555; }
-        li { margin: 5px 0; }
-        @page {
-          size: landscape;
-          margin: 12mm;
-        }
-      </style>
-    </head>
-    <body>
-      <h1>ALKIRA — Informe KDD</h1>
-      <p>
-        Inmueble: ${escaparHtml(idInmueble || 'Todos')}
-        · Periodo: ${escaparHtml(periodo || 'Todos')}
-      </p>
-      <p>
-        <small>
-          Reporte descriptivo. Máximo 200 filas por tabla.
+      <head>
+        <meta charset="utf-8" />
+        <title>Informe KDD - ALKIRA</title>
+
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            color: #17223b;
+            padding: 15px;
+          }
+
+          h1 {
+            font-size: 22px;
+          }
+
+          h2 {
+            font-size: 16px;
+            margin-top: 24px;
+          }
+
+          table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 11px;
+          }
+
+          th, td {
+            border: 1px solid #bbb;
+            padding: 6px;
+            text-align: left;
+            overflow-wrap: anywhere;
+          }
+
+          th {
+            background: #eee;
+          }
+
+          li {
+            margin: 6px 0;
+          }
+
+          @page {
+            size: landscape;
+            margin: 12mm;
+          }
+        </style>
+      </head>
+
+      <body>
+        <h1>ALKIRA — Informe KDD</h1>
+
+        <p>
+          Inmueble: ${escaparHtml(inmueble || 'Todos')}
+          · Periodo: ${escaparHtml(periodo || 'Todos')}
+        </p>
+
+        <p>
+          Reporte descriptivo, máximo 200 filas por tabla.
           No es una predicción de IA.
-        </small>
-      </p>
+        </p>
 
-      <h2>Hallazgos</h2>
-      <ul>
-        ${patrones || '<li>Sin hallazgos en los filtros.</li>'}
-      </ul>
+        <h2>Hallazgos</h2>
 
-      ${tabla('Pagos registrados', COLUMNAS_PAGOS, reporte.pagos)}
-      ${tabla('Incidencias y mantenimiento', COLUMNAS_MANTENIMIENTO, reporte.mantenimiento)}
-      ${tabla('Alertas de morosidad', COLUMNAS_ALERTAS, reporte.alertas)}
-    </body>
+        <ul>
+          ${hallazgos || '<li>Sin hallazgos.</li>'}
+        </ul>
+
+        ${reporte.seguimientoCartera
+          ? tabla(
+              'Prioridad de seguimiento',
+              SEGUIMIENTO,
+              reporte.seguimientoCartera.unidades ?? []
+            )
+          : ''
+        }
+
+        ${tabla('Pagos', PAGOS, reporte.pagos)}
+
+        ${tabla(
+          'Mantenimiento',
+          MANTENIMIENTO,
+          reporte.mantenimiento
+        )}
+
+        ${tabla(
+          'Alertas de morosidad',
+          ALERTAS,
+          reporte.alertas
+        )}
+      </body>
     </html>
   `
 
@@ -171,93 +236,101 @@ function imprimirInforme(reporte, periodo, idInmueble) {
 
   if (!ventana) {
     window.alert(
-      'El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para localhost.'
+      'Permite ventanas emergentes para localhost y vuelve a intentarlo.'
     )
     return
   }
 
   ventana.document.open()
-  ventana.document.write(contenido)
+  ventana.document.write(html)
   ventana.document.close()
+
   ventana.focus()
   ventana.print()
-}
-
-function colorPatron(patron) {
-  const texto = `${patron?.titulo ?? ''} ${patron?.detalle ?? ''}`.toLowerCase()
-
-  if (
-    texto.includes('venc') ||
-    texto.includes('moros') ||
-    texto.includes('urgente') ||
-    texto.includes('alta')
-  ) {
-    return 'warning'
-  }
-
-  if (texto.includes('pago') || texto.includes('aplic')) {
-    return 'success'
-  }
-
-  return 'info'
 }
 
 function TablaKdd({
   titulo,
   columnas,
   filas,
-  nombreArchivo
+  archivo
 }) {
   return (
-    <div className="card border-0 shadow-sm mb-4">
-      <div className="card-body">
-        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-          <h3 className="h6 fw-bold mb-0">
-            {titulo} ({filas.length})
-          </h3>
+    <div className="mt-3">
 
-          <button
-            type="button"
-            className="btn btn-outline-primary btn-sm"
-            onClick={() => descargarCsv(nombreArchivo, columnas, filas)}
-          >
-            Descargar CSV
-          </button>
-        </div>
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h4 className="h6 fw-bold mb-0">
+          {titulo} ({filas.length})
+        </h4>
 
-        {filas.length === 0 ? (
-          <p className="text-secondary small mb-0">
-            No hay registros para los filtros seleccionados.
-          </p>
-        ) : (
-          <div className="table-responsive">
-            <table className="table table-striped table-sm align-middle">
-              <thead>
-                <tr>
-                  {columnas.map((columna) => (
-                    <th key={columna.campo} scope="col">
-                      {columna.titulo}
-                    </th>
+        <button
+          type="button"
+          className="btn btn-outline-primary btn-sm"
+          onClick={() =>
+            descargarCsv(archivo, columnas, filas)
+          }
+        >
+          Descargar CSV
+        </button>
+      </div>
+
+      {filas.length === 0 ? (
+        <p className="text-secondary small">
+          No hay registros con estos filtros.
+        </p>
+      ) : (
+        <div className="table-responsive">
+          <table className="table table-sm table-striped align-middle">
+            <thead>
+              <tr>
+                {columnas.map(([campo, tituloCol]) => (
+                  <th key={campo} scope="col">
+                    {tituloCol}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {filas.map((fila, indice) => (
+                <tr key={`${archivo}-${indice}`}>
+                  {columnas.map(([campo]) => (
+                    <td key={campo}>
+                      {texto(fila[campo])}
+                    </td>
                   ))}
                 </tr>
-              </thead>
-
-              <tbody>
-                {filas.map((fila, indice) => (
-                  <tr key={`${nombreArchivo}-${indice}`}>
-                    {columnas.map((columna) => (
-                      <td key={columna.campo}>
-                        {textoCelda(fila[columna.campo])}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
+  )
+}
+
+function Apartado({
+  titulo,
+  cantidad,
+  children,
+  abierto = false
+}) {
+  return (
+    <details
+      className="card border-0 shadow-sm mb-3"
+      open={abierto}
+    >
+      <summary
+        className="card-body fw-bold"
+        style={{ cursor: 'pointer' }}
+      >
+        {titulo} · {cantidad}
+      </summary>
+
+      <div className="px-3 pb-3">
+        {children}
+      </div>
+    </details>
   )
 }
 
@@ -269,41 +342,40 @@ function HistorialesKdd({ idInmueble, periodo }) {
   useEffect(() => {
     const controlador = new AbortController()
 
-    async function cargarReportes() {
+    async function cargar() {
       setCargando(true)
       setError('')
       setReporte(null)
 
+      const parametros = new URLSearchParams()
+
+      if (idInmueble) {
+        parametros.set('idInmueble', idInmueble)
+      }
+
+      if (periodo) {
+        parametros.set('periodo', periodo)
+      }
+
+      const consulta = parametros.toString()
+
       try {
-        const parametros = new URLSearchParams()
-
-        if (idInmueble) {
-          parametros.set('idInmueble', idInmueble)
-        }
-
-        if (periodo) {
-          parametros.set('periodo', periodo)
-        }
-
-        const consulta = parametros.toString()
-
-        const ruta = `/api/kdd/reportes${
-          consulta ? `?${consulta}` : ''
-        }`
-
-        const respuesta = await fetch(ruta, {
-          credentials: 'same-origin',
-          headers: {
-            Accept: 'application/json'
-          },
-          signal: controlador.signal
-        })
+        const respuesta = await fetch(
+          `/api/kdd/reportes${consulta ? `?${consulta}` : ''}`,
+          {
+            credentials: 'same-origin',
+            headers: {
+              Accept: 'application/json'
+            },
+            signal: controlador.signal
+          }
+        )
 
         if (!respuesta.ok) {
           throw new Error(
             respuesta.status === 401
               ? 'Tu sesión venció. Inicia sesión nuevamente.'
-              : 'No fue posible consultar los historiales KDD.'
+              : `No fue posible consultar los reportes (HTTP ${respuesta.status}).`
           )
         }
 
@@ -315,7 +387,9 @@ function HistorialesKdd({ idInmueble, periodo }) {
           !Array.isArray(datos.alertas) ||
           !Array.isArray(datos.patrones)
         ) {
-          throw new Error('La API devolvió un reporte incompleto.')
+          throw new Error(
+            'La API devolvió un reporte incompleto.'
+          )
         }
 
         if (!controlador.signal.aborted) {
@@ -332,47 +406,41 @@ function HistorialesKdd({ idInmueble, periodo }) {
       }
     }
 
-    cargarReportes()
+    cargar()
+
     return () => controlador.abort()
   }, [idInmueble, periodo])
 
   return (
-    <section className="mt-2" aria-label="Historiales y reportes KDD">
+    <section aria-label="Reportes KDD">
+
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
-          <h2 className="h5 fw-bold mb-1">
-            Historiales, patrones y reportes
-          </h2>
+          <h3 className="h5 fw-bold mb-1">
+            Reportes y seguimiento
+          </h3>
 
-          <p className="text-secondary small mb-0">
-            Esta es la parte del paso 59: aquí validas tablas, alertas y exportaciones.
+          <p className="small text-secondary mb-0">
+            Abre solamente la información que necesites.
           </p>
         </div>
 
-        {reporte && (
+        {reporte && !cargando && (
           <button
-            type="button"
             className="btn btn-primary btn-sm"
-            onClick={() => imprimirInforme(reporte, periodo, idInmueble)}
+            type="button"
+            onClick={() =>
+              imprimirInforme(reporte, periodo, idInmueble)
+            }
           >
             Imprimir / Guardar PDF
           </button>
         )}
       </div>
 
-      <div className="kdd-help-box mb-4">
-        <h4 className="h6 fw-bold">Qué debes revisar aquí</h4>
-        <ol className="small text-secondary">
-          <li>Que las tablas cambien según el periodo o inmueble seleccionado.</li>
-          <li>Que los pagos, incidencias y alertas coincidan con MySQL.</li>
-          <li>Que el CSV descargue el contenido correcto.</li>
-          <li>Que “Imprimir / Guardar PDF” genere el reporte final.</li>
-        </ol>
-      </div>
-
       {cargando && (
         <div className="alert alert-secondary">
-          Cargando historiales...
+          Cargando reportes...
         </div>
       )}
 
@@ -384,102 +452,106 @@ function HistorialesKdd({ idInmueble, periodo }) {
 
       {reporte && !cargando && (
         <>
-          <div className="kdd-insights-grid mb-4">
-            <div className="kdd-insight">
-              <div className="kdd-insight__title">Pagos encontrados</div>
-              <div className="kdd-insight__value">{reporte.pagos.length}</div>
-              <p className="text-secondary small mb-0">
-                Registros de pago dentro del filtro actual.
-              </p>
-            </div>
+          <Apartado
+            titulo="Seguimiento de cobranza"
+            cantidad={`${
+              reporte.seguimientoCartera?.unidades?.length ?? 0
+            } unidades`}
+            abierto
+          >
+            <SeguimientoCarteraKdd
+              datos={reporte.seguimientoCartera}
+            />
 
-            <div className="kdd-insight">
-              <div className="kdd-insight__title">Incidencias / mantenimiento</div>
-              <div className="kdd-insight__value">{reporte.mantenimiento.length}</div>
-              <p className="text-secondary small mb-0">
-                Registros operativos relacionados al análisis.
-              </p>
-            </div>
+            {reporte.seguimientoCartera && (
+              <details className="px-3 pb-2">
+                <summary
+                  className="small fw-semibold"
+                  style={{ cursor: 'pointer' }}
+                >
+                  Ver tabla completa y descargar CSV
+                </summary>
 
-            <div className="kdd-insight">
-              <div className="kdd-insight__title">Alertas de morosidad</div>
-              <div className="kdd-insight__value">{reporte.alertas.length}</div>
-              <p className="text-secondary small mb-0">
-                Reglas descriptivas activadas en el periodo seleccionado.
-              </p>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <h3 className="h6 fw-bold mb-3">Hallazgos KDD</h3>
-
-            {reporte.patrones.length === 0 ? (
-              <div className="card border-0 shadow-sm">
-                <div className="card-body">
-                  <p className="text-secondary small mb-0">
-                    No se detectaron alertas con estas reglas y filtros.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="kdd-pattern-grid">
-                {reporte.patrones.map((patron, indice) => {
-                  const tono = colorPatron(patron)
-
-                  return (
-                    <div
-                      key={`${patron.tipo}-${indice}`}
-                      className="kdd-pattern-card"
-                    >
-                      <span className={`kdd-pattern-badge kdd-pattern-badge--${tono}`}>
-                        {patron.tipo || 'Hallazgo'}
-                      </span>
-
-                      <h4 className="h6 fw-bold mb-2">
-                        {patron.titulo}
-                      </h4>
-
-                      <p className="text-secondary small mb-0">
-                        {patron.detalle}
-                      </p>
-                    </div>
-                  )
-                })}
-              </div>
+                <TablaKdd
+                  titulo="Prioridades por unidad"
+                  columnas={SEGUIMIENTO}
+                  filas={
+                    reporte.seguimientoCartera.unidades ?? []
+                  }
+                  archivo="kdd_prioridades_cobranza.csv"
+                />
+              </details>
             )}
-          </div>
+          </Apartado>
 
-          <TablaKdd
+          <Apartado
             titulo="Pagos registrados"
-            columnas={COLUMNAS_PAGOS}
-            filas={reporte.pagos}
-            nombreArchivo="kdd_pagos.csv"
-          />
+            cantidad={reporte.pagos.length}
+          >
+            <TablaKdd
+              titulo="Pagos"
+              columnas={PAGOS}
+              filas={reporte.pagos}
+              archivo="kdd_pagos.csv"
+            />
+          </Apartado>
 
-          <TablaKdd
-            titulo="Incidencias y mantenimiento"
-            columnas={COLUMNAS_MANTENIMIENTO}
-            filas={reporte.mantenimiento}
-            nombreArchivo="kdd_mantenimiento.csv"
-          />
+          <Apartado
+            titulo="Mantenimiento"
+            cantidad={reporte.mantenimiento.length}
+          >
+            <TablaKdd
+              titulo="Incidencias y tickets"
+              columnas={MANTENIMIENTO}
+              filas={reporte.mantenimiento}
+              archivo="kdd_mantenimiento.csv"
+            />
+          </Apartado>
 
-          <TablaKdd
-            titulo="Alertas descriptivas de morosidad"
-            columnas={COLUMNAS_ALERTAS}
-            filas={reporte.alertas}
-            nombreArchivo="kdd_alertas.csv"
-          />
+          <Apartado
+            titulo="Alertas descriptivas"
+            cantidad={reporte.alertas.length}
+          >
+            <TablaKdd
+              titulo="Alertas de morosidad"
+              columnas={ALERTAS}
+              filas={reporte.alertas}
+              archivo="kdd_alertas.csv"
+            />
+          </Apartado>
 
-          <div className="alert alert-info small">
-            Cada tabla muestra un máximo de {reporte.limitePorLista} registros.
-            Los pagos en revisión no equivalen a pagos aprobados.
-            Las alertas son descriptivas, no un modelo predictivo entrenado.
-            Para guardar el PDF usa el botón “Imprimir / Guardar PDF”.
-          </div>
+          <Apartado
+            titulo="Hallazgos del análisis"
+            cantidad={reporte.patrones.length}
+          >
+            {reporte.patrones.length === 0 ? (
+              <p className="small text-secondary mb-0">
+                Sin hallazgos para estos filtros.
+              </p>
+            ) : (
+              <ul className="mb-0">
+                {reporte.patrones.map((patron, indice) => (
+                  <li
+                    key={`${patron.tipo}-${indice}`}
+                    className="mb-2"
+                  >
+                    <strong>{patron.titulo}:</strong>{' '}
+                    {patron.detalle}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Apartado>
+
+          <p className="text-secondary small">
+            Máximo {reporte.limitePorLista ?? 200} filas
+            por tabla. Las prioridades son reglas
+            descriptivas, no predicciones de IA.
+          </p>
         </>
       )}
     </section>
   )
 }
 
-export default HistorialesKdd 
+export default HistorialesKdd
