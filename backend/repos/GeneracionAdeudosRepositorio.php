@@ -245,4 +245,81 @@ final class GeneracionAdeudosRepositorio
 
         return (int) $this->conexion->lastInsertId();
     }
+
+    /**
+     * Guarda una copia de la configuración de mora
+     * correspondiente a un adeudo nuevo.
+     *
+     * Debe ejecutarse dentro de la misma transacción
+     * que crea el estado de cuenta.
+     *
+     * No aplica todavía el importe del recargo.
+     */
+    public function registrarConfiguracionRecargo(
+        int $idEstadoCuenta,
+        int $idReglaCobro,
+        string $tipoRecargo,
+        string $valorRecargo
+    ): void {
+        if (!$this->conexion->inTransaction()) {
+            throw new LogicException(
+                'El registro del recargo requiere una transacción activa.'
+            );
+        }
+
+        if ($idEstadoCuenta <= 0 || $idReglaCobro <= 0) {
+            throw new InvalidArgumentException(
+                'Los identificadores del adeudo y la regla son inválidos.'
+            );
+        }
+
+        if (!in_array($tipoRecargo, ['fijo', 'porcentaje'], true)) {
+            throw new InvalidArgumentException(
+                'El tipo de recargo no está permitido.'
+            );
+        }
+
+        if (
+            preg_match(
+                '/^(?:0|[1-9][0-9]{0,9})(?:\.[0-9]{1,2})?$/D',
+                $valorRecargo
+            ) !== 1
+            || (
+                $tipoRecargo === 'porcentaje'
+                && (float) $valorRecargo > 100
+            )
+        ) {
+            throw new InvalidArgumentException(
+                'El importe del recargo no es válido.'
+            );
+        }
+
+        $consulta = $this->conexion->prepare(
+            <<<'SQL'
+            INSERT INTO recargos_mora_adeudos (
+                id_estado_cuenta,
+                id_regla_cobro,
+                tipo_recargo,
+                valor_recargo,
+                fecha_aplicacion,
+                monto_aplicado
+            )
+            VALUES (
+                :idEstadoCuenta,
+                :idReglaCobro,
+                :tipoRecargo,
+                :valorRecargo,
+                NULL,
+                NULL
+            )
+            SQL
+        );
+
+        $consulta->execute([
+            'idEstadoCuenta' => $idEstadoCuenta,
+            'idReglaCobro' => $idReglaCobro,
+            'tipoRecargo' => $tipoRecargo,
+            'valorRecargo' => $valorRecargo
+        ]);
+    }
 }

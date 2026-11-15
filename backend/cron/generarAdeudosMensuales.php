@@ -2,24 +2,24 @@
 declare(strict_types=1);
 
 /**
- * HU02.3 - Generación mensual automática de adeudos.
+ * HU02.3 - Tarea local de generación mensual de adeudos.
  *
- * Ejecutar en terminal:
- *
+ * Ejemplos:
  * php backend/cron/generarAdeudosMensuales.php --simular
  * php backend/cron/generarAdeudosMensuales.php --ejecutar
  *
- * La ejecución real requiere autorización explícita.
+ * El modo --simular es siempre de solo lectura.
+ * El modo --ejecutar requiere ALKIRA_CRON_ADEUDOS_HABILITADO=1.
  */
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
-    exit('Esta tarea solo puede ejecutarse desde terminal.');
+    exit('Esta tarea solo se ejecuta desde la terminal.');
 }
 
 require_once dirname(__DIR__) . '/config/Conexion.php';
-require_once dirname(__DIR__)
-    . '/services/EjecucionAdeudosServicio.php';
+require_once dirname(__DIR__) . '/services/EjecucionAdeudosServicio.php';
+require_once dirname(__DIR__) . '/services/RecargosMoraServicio.php';
 
 $modo = $argv[1] ?? '--simular';
 
@@ -40,13 +40,13 @@ if (
 }
 
 try {
-    // Verificar la configuración de desarrollo.
+    // El proyecto utiliza MySQL local.
     $rutaConfiguracion = dirname(__DIR__)
         . '/config/baseDatos.local.php';
 
     if (!is_file($rutaConfiguracion)) {
         throw new RuntimeException(
-            'Falta la configuración local de MySQL.'
+            'No existe la configuración local de MySQL.'
         );
     }
 
@@ -59,11 +59,10 @@ try {
             ['localhost', '127.0.0.1', '::1'],
             true
         )
-        || ($configuracion['baseDatos'] ?? null)
-            !== 'alkira'
+        || ($configuracion['baseDatos'] ?? null) !== 'alkira'
     ) {
         throw new RuntimeException(
-            'Esta tarea solo admite MySQL local: alkira.'
+            'La tarea solo admite MySQL local: alkira.'
         );
     }
 
@@ -74,11 +73,11 @@ try {
             ->fetchColumn() !== 'alkira'
     ) {
         throw new RuntimeException(
-            'La conexión apunta a otra base de datos.'
+            'La conexión usa una base de datos distinta.'
         );
     }
 
-    // Inicializar nuestros servicios.
+    // Servicios existentes de HU02.3.
     $repositorio = new GeneracionAdeudosRepositorio(
         $conexion
     );
@@ -92,7 +91,9 @@ try {
         $simulador
     );
 
-    // Trabajar con la fecha local de México.
+    $servicioRecargos = new RecargosMoraServicio($conexion);
+
+    // Fecha de México.
     $hoy = new DateTimeImmutable(
         'today',
         new DateTimeZone('America/Mexico_City')
@@ -100,20 +101,29 @@ try {
 
     $fechaActual = $hoy->format('Y-m-d');
     $periodo = $hoy->format('Y-m');
-    $ultimoDia = (int) $hoy->format('t');
 
     echo "=== HU02.3 / {$periodo} ===\n";
     echo "Fecha local: {$fechaActual}\n";
 
     echo 'Modo: '
-        . ($modo === '--ejecutar'
-            ? 'ejecución'
-            : 'simulación')
+        . (
+            $modo === '--ejecutar'
+                ? 'ejecución'
+                : 'simulación'
+        )
         . "\n";
 
-    // Consultar el periodo sin escrituras.
-    $simulacion = $simulador
-        ->simularPeriodo($periodo);
+    // NUEVO:
+    // Evaluamos cada contrato según su propia fecha
+    // de corte, sin exigir que todas las reglas
+    // tengan el mismo día.
+    //
+    // Las cuotas futuras quedan como corte_pendiente.
+    // Las cuotas vencidas no se generan retroactivamente.
+    $simulacion = $simulador->simularPeriodo(
+        $periodo,
+        $fechaActual
+    );
 
     echo 'Reglas activas: '
         . $simulacion['reglasActivas'] . "\n";
@@ -121,82 +131,70 @@ try {
     echo 'Contratos evaluados: '
         . $simulacion['contratosEvaluados'] . "\n";
 
-    echo 'Cobros generables: '
+    echo 'Cobros generables hoy: '
         . $simulacion['generables'] . "\n";
 
     echo 'Contratos omitidos: '
         . $simulacion['omitidos'] . "\n";
 
-    // El modo predeterminado nunca escribe en MySQL.
+    echo 'Fechas por definir: '
+        . $simulacion['pendientesDefinicion'] . "\n";
+
+    // Mostrar resultados individuales.
+    foreach ($simulacion['detalle'] as $registro) {
+        echo 'Contrato #'
+            . $registro['idContrato']
+            . ': '
+            . $registro['resultado']
+            . "\n";
+    }
+
+    // Consultar recargos vencidos sin aplicarlos.
+    // Tambien permanece en modo lectura si el usuario
+    // ejecuta el comando de generacion de adeudos.
+    $simulacionRecargos = $servicioRecargos->simularRecargos();
+
+    echo "--- Simulacion de recargos por mora ---\n";
+    echo 'Adeudos evaluados: '
+        . $simulacionRecargos['adeudosEvaluados'] . "\n";
+    echo 'Recargos fijos aplicables: '
+        . $simulacionRecargos['recargosFijosAplicables'] . "\n";
+    echo 'Recargos porcentuales aplicables: '
+        . $simulacionRecargos['recargosPorcentualesAplicables'] . "\n";
+    echo 'Monto total simulado: $'
+        . $simulacionRecargos['montoTotalRecargos'] . "\n";
+
+    foreach ($simulacionRecargos['detalle'] as $registro) {
+        echo 'Adeudo #'
+            . $registro['idEstadoCuenta']
+            . ': recargo '
+            . $registro['tipoRecargo']
+            . ' $'
+            . $registro['montoRecargo']
+            . "\n";
+    }
+
+    echo "Los recargos NO se aplicaron.\n";
+
+    // Modo seguro: ninguna escritura en MySQL.
     if ($modo === '--simular') {
         echo "Simulación completada. No se modificó MySQL.\n";
         exit(0);
     }
 
-    // Protección adicional para la tarea programada.
+    // La ejecución real sigue deshabilitada
+    // a menos que se active explícitamente.
     if (
-        getenv('ALKIRA_CRON_ADEUDOS_HABILITADO')
-        !== '1'
+        getenv('ALKIRA_CRON_ADEUDOS_HABILITADO') !== '1'
     ) {
         throw new RuntimeException(
             'Ejecución bloqueada: '
-            . 'ALKIRA_CRON_ADEUDOS_HABILITADO '
-            . 'no está en 1.'
+            . 'ALKIRA_CRON_ADEUDOS_HABILITADO no está en 1.'
         );
     }
 
-    $reglas = $repositorio->listarReglasActivas();
-
-    if ($reglas === []) {
+    if ((int) $simulacion['reglasActivas'] === 0) {
         echo "Sin reglas activas. No se generaron cobros.\n";
-        exit(0);
-    }
-
-    // El ejecutor trabaja por periodo completo.
-    // Para impedir cobros anticipados, todas las
-    // reglas deben coincidir en la fecha de corte.
-    $fechasCorte = [];
-
-    foreach ($reglas as $regla) {
-        $diaCorte = (int) $regla['diaCorte'];
-
-        if ($diaCorte < 1 || $diaCorte > 31) {
-            throw new DomainException(
-                'Hay un día de corte inválido.'
-            );
-        }
-
-        // Ajustar al último día en meses cortos.
-        $diaAplicable = min(
-            $diaCorte,
-            $ultimoDia
-        );
-
-        $fechasCorte[] = sprintf(
-            '%s-%02d',
-            $periodo,
-            $diaAplicable
-        );
-    }
-
-    $fechasUnicas = array_values(
-        array_unique($fechasCorte)
-    );
-
-    if (count($fechasUnicas) !== 1) {
-        throw new DomainException(
-            'Hay diferentes fechas de corte activas. '
-            . 'La automatización por alcance '
-            . 'requiere una adaptación adicional.'
-        );
-    }
-
-    // Solo generar en el día de corte.
-    if ($fechaActual !== $fechasUnicas[0]) {
-        echo 'Hoy no es el día de corte ('
-            . $fechasUnicas[0]
-            . "). No se generaron cobros.\n";
-
         exit(0);
     }
 
@@ -204,12 +202,13 @@ try {
         (int) $simulacion['pendientesDefinicion'] > 0
     ) {
         throw new DomainException(
-            'Existen reglas con fechas inconsistentes.'
+            'Existen reglas con fechas inconsistentes. '
+            . 'No se generaron cobros.'
         );
     }
 
-    // Evitar que dos tareas CLI ejecuten
-    // simultáneamente el mismo periodo.
+    // Evitar que dos tareas CLI generen
+    // el mismo periodo simultáneamente.
     $nombreBloqueo = 'alkira_hu02_3_' . $periodo;
 
     $consultaBloqueo = $conexion->prepare(
@@ -224,19 +223,27 @@ try {
         (int) $consultaBloqueo->fetchColumn() !== 1
     ) {
         throw new RuntimeException(
-            'Ya hay otra generación mensual en ejecución.'
+            'Ya existe otra ejecución mensual '
+            . 'para este periodo.'
         );
     }
 
     try {
-        // El servicio vuelve a verificar reglas,
-        // contratos vigentes y duplicados.
+        // NUEVO:
+        // Enviar la fecha actual al ejecutor.
+        // Solo se procesan contratos cuyo corte
+        // ya corresponde y cuyo plazo no ha vencido.
+        //
+        // El ejecutor vuelve a validar las reglas,
+        // la vigencia y los duplicados.
         $resultado = $ejecutor->generarPeriodo(
-            $periodo
+            $periodo,
+            $fechaActual
         );
 
         echo 'Adeudos creados: '
-            . $resultado['creados'] . "\n";
+            . $resultado['creados']
+            . "\n";
 
         echo 'Duplicados omitidos durante ejecución: '
             . $resultado['omitidosPorDuplicado']
@@ -245,7 +252,7 @@ try {
         echo "Generación mensual finalizada.\n";
 
     } finally {
-        // Liberar el bloqueo de la tarea.
+        // Liberar bloqueo incluso si falla el proceso.
         $consultaLiberar = $conexion->prepare(
             'SELECT RELEASE_LOCK(:nombre)'
         );

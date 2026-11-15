@@ -12,36 +12,49 @@ final class EjecucionAdeudosServicio
     }
 
     /**
-     * Generación real: confirma los adeudos creados.
-     * Esta operación aún no está habilitada en la API.
+     * Genera y confirma los adeudos del periodo.
+     *
+     * La fecha máxima es opcional para conservar
+     * el funcionamiento de la generación manual.
      *
      * @return array<string, mixed>
      */
-    public function generarPeriodo(string $periodo): array
-    {
-        return $this->procesarPeriodo($periodo, true);
+    public function generarPeriodo(
+        string $periodo,
+        ?string $fechaMaximaEmision = null
+    ): array {
+        return $this->procesarPeriodo(
+            $periodo,
+            true,
+            $fechaMaximaEmision
+        );
     }
 
     /**
-     * Ensayo integral: ejecuta las inserciones,
-     * pero siempre revierte la transacción.
+     * Ensaya la generación y revierte las inserciones.
      *
      * @return array<string, mixed>
      */
-    public function probarPeriodo(string $periodo): array
-    {
-        return $this->procesarPeriodo($periodo, false);
+    public function probarPeriodo(
+        string $periodo,
+        ?string $fechaMaximaEmision = null
+    ): array {
+        return $this->procesarPeriodo(
+            $periodo,
+            false,
+            $fechaMaximaEmision
+        );
     }
 
     /**
-     * Procesa un periodo con las mismas reglas
-     * para pruebas y ejecución real.
+     * Ejecuta las validaciones y procesa el periodo.
      *
      * @return array<string, mixed>
      */
     private function procesarPeriodo(
         string $periodo,
-        bool $confirmarCambios
+        bool $confirmarCambios,
+        ?string $fechaMaximaEmision
     ): array {
         $hoy = new DateTimeImmutable(
             'today',
@@ -50,32 +63,44 @@ final class EjecucionAdeudosServicio
 
         $fechaActual = $hoy->format('Y-m-d');
 
-        $simulacion = $this->simulador
-            ->simularPeriodo($periodo);
-
-        if ($periodo < $hoy->format('Y-m')) {
-            throw new DomainException(
-                'No se permite generar adeudos de meses anteriores. '
-                . 'Los periodos retroactivos requieren revisión.'
+        // En la automatización, impedir utilizar
+        // fechas futuras o de otro periodo.
+        if ($fechaMaximaEmision !== null) {
+            $this->validarFechaMaximaEmision(
+                $periodo,
+                $fechaMaximaEmision,
+                $fechaActual
             );
         }
 
-        if (
-            (int) $simulacion['pendientesDefinicion'] > 0
-        ) {
+        // La simulación selecciona solamente
+        // contratos cuya fecha de corte ya llegó.
+        // Sin fecha máxima conserva el modo manual.
+        $simulacion = $this->simulador->simularPeriodo(
+            $periodo,
+            $fechaMaximaEmision
+        );
+
+        if ($periodo < $hoy->format('Y-m')) {
             throw new DomainException(
-                'Existen fechas pendientes de definición. '
-                . 'No se generó ningún adeudo.'
+                'No se permite generar adeudos de meses anteriores.'
+            );
+        }
+
+        if ((int) $simulacion['pendientesDefinicion'] > 0) {
+            throw new DomainException(
+                'Hay reglas con fechas pendientes de definición.'
             );
         }
 
         if ((int) $simulacion['reglasActivas'] === 0) {
             throw new DomainException(
-                'No existen reglas activas. '
-                . 'No se generó ningún adeudo.'
+                'No existen reglas activas. No se generó ningún adeudo.'
             );
         }
 
+        // Solamente procesar registros generables.
+        // Los corte_pendiente quedan excluidos.
         $candidatos = array_values(
             array_filter(
                 $simulacion['detalle'],
@@ -84,8 +109,7 @@ final class EjecucionAdeudosServicio
             )
         );
 
-        // Ordenar para bloquear contratos
-        // siempre en el mismo orden.
+        // Orden estable para bloquear contratos.
         usort(
             $candidatos,
             static fn (
@@ -93,19 +117,26 @@ final class EjecucionAdeudosServicio
                 array $segundo
             ): int =>
                 (int) $primero['idContrato']
-                <=>
-                (int) $segundo['idContrato']
+                <=> (int) $segundo['idContrato']
         );
 
-        // No procesar cuotas cuyo plazo terminó.
         foreach ($candidatos as $registro) {
             if (
                 (string) $registro['fechaLimitePago']
                 < $fechaActual
             ) {
                 throw new DomainException(
-                    'Hay cuotas cuya fecha límite ya venció. '
-                    . 'No se generó ningún adeudo.'
+                    'Existe una cuota con plazo vencido; no se generó el lote.'
+                );
+            }
+
+            if (
+                $fechaMaximaEmision !== null
+                && (string) $registro['fechaEmision']
+                    > $fechaMaximaEmision
+            ) {
+                throw new DomainException(
+                    'La simulación incluyó una cuota antes de su fecha de corte.'
                 );
             }
         }
@@ -114,8 +145,6 @@ final class EjecucionAdeudosServicio
             ? 'generacion_controlada'
             : 'prueba_revertida';
 
-        // No hace falta abrir una transacción
-        // cuando no hay cobros generables.
         if ($candidatos === []) {
             return [
                 'periodo' => $periodo,
@@ -127,7 +156,7 @@ final class EjecucionAdeudosServicio
         }
 
         $creados = [];
-        $omitidosPorDuplicado = [];
+        $omitidosPorDuplicado = 0;
 
         $this->repositorio->iniciarTransaccion();
 
@@ -135,15 +164,14 @@ final class EjecucionAdeudosServicio
             foreach ($candidatos as $registro) {
                 $idContrato = (int) $registro['idContrato'];
 
-                // Bloquear el contrato.
+                // Bloquear el contrato antes de
+                // comprobar si tiene mantenimiento.
                 $contrato = $this->repositorio
                     ->bloquearContrato($idContrato);
 
                 if ($contrato === false) {
                     throw new DomainException(
-                        "El contrato #{$idContrato} "
-                        . 'dejó de estar vigente. '
-                        . 'Vuelve a ejecutar la simulación.'
+                        "El contrato #{$idContrato} dejó de estar vigente."
                     );
                 }
 
@@ -152,14 +180,11 @@ final class EjecucionAdeudosServicio
                     !== (string) $registro['tipoUnidad']
                 ) {
                     throw new DomainException(
-                        "Cambió el tipo de unidad del "
-                        . "contrato #{$idContrato}. "
-                        . 'Vuelve a simular.'
+                        "Cambió el tipo de unidad del contrato #{$idContrato}."
                     );
                 }
 
-                // Consultar las reglas actuales
-                // después del bloqueo.
+                // Recuperar las reglas actuales.
                 $reglasActuales = $this->repositorio
                     ->listarReglasActivas();
 
@@ -170,20 +195,16 @@ final class EjecucionAdeudosServicio
 
                 if ($regla === null) {
                     throw new DomainException(
-                        "El contrato #{$idContrato} "
-                        . 'ya no tiene una regla aplicable.'
+                        "El contrato #{$idContrato} ya no tiene regla activa."
                     );
                 }
 
-                // Verificar el orden de las fechas.
                 if (
                     (int) $regla['diaLimitePago']
                     < (int) $regla['diaCorte']
                 ) {
                     throw new DomainException(
-                        "La regla del contrato #{$idContrato} "
-                        . 'tiene el día límite anterior '
-                        . 'al día de corte.'
+                        "La regla del contrato #{$idContrato} tiene fechas inconsistentes."
                     );
                 }
 
@@ -201,8 +222,8 @@ final class EjecucionAdeudosServicio
                     $regla['montoCuota']
                 );
 
-                // Impedir cambios de configuración
-                // entre la simulación y la ejecución.
+                // Comprobar que la configuración
+                // no cambió después de simular.
                 if (
                     (int) $regla['idReglaCobro']
                         !== (int) $registro['idReglaCobro']
@@ -216,21 +237,18 @@ final class EjecucionAdeudosServicio
                         !== (string) $registro['fechaLimitePago']
                 ) {
                     throw new DomainException(
-                        "La configuración del contrato "
-                        . "#{$idContrato} cambió. "
-                        . 'Vuelve a simular.'
+                        "Cambió la configuración del contrato #{$idContrato}."
                     );
                 }
 
-                $fechaInicio = (string) $contrato[
-                    'fechaInicio'
-                ];
+                $fechaInicio = (string) $contrato['fechaInicio'];
 
                 $fechaFin = $contrato['fechaFin'] === null
                     ? null
                     : (string) $contrato['fechaFin'];
 
-                // Comprobar vigencia del contrato.
+                // Verificar vigencia del contrato
+                // y coherencia de las fechas.
                 if (
                     $fechaInicio > $fechaEmision
                     || (
@@ -240,21 +258,28 @@ final class EjecucionAdeudosServicio
                     || $fechaLimitePago < $fechaEmision
                 ) {
                     throw new DomainException(
-                        "Las fechas del contrato "
-                        . "#{$idContrato} requieren revisión."
+                        "Las fechas del contrato #{$idContrato} requieren revisión."
                     );
                 }
 
                 if ($fechaLimitePago < $fechaActual) {
                     throw new DomainException(
-                        "La cuota del contrato #{$idContrato} "
-                        . 'ya venció. '
-                        . 'No se generó ningún adeudo.'
+                        "La cuota del contrato #{$idContrato} ya venció."
                     );
                 }
 
-                // Comprobar nuevamente si ya existe
-                // mantenimiento para ese contrato y mes.
+                // NUEVO: verificar nuevamente el corte
+                // dentro de la transacción.
+                if (
+                    $fechaMaximaEmision !== null
+                    && $fechaEmision > $fechaMaximaEmision
+                ) {
+                    throw new DomainException(
+                        "Todavía no llega el corte del contrato #{$idContrato}."
+                    );
+                }
+
+                // Segunda comprobación de duplicados.
                 if (
                     $this->repositorio
                         ->existeCobroMantenimiento(
@@ -262,12 +287,12 @@ final class EjecucionAdeudosServicio
                             $periodo
                         )
                 ) {
-                    $omitidosPorDuplicado[] = $idContrato;
+                    $omitidosPorDuplicado++;
                     continue;
                 }
 
-                // Inserción mediante el repositorio.
-                // El recargo comienza en 0.00.
+                // Crear el adeudo.
+                // El recargo inicial permanece en 0.00.
                 $idEstadoCuenta = $this->repositorio
                     ->crearAdeudo(
                         $idContrato,
@@ -278,14 +303,22 @@ final class EjecucionAdeudosServicio
                         $montoPrincipal
                     );
 
+                // Guardar la configuración del recargo al crear
+                // el adeudo. Ambos registros comparten transacción.
+                // Si falla el INSERT auxiliar, se revierte el adeudo.
+                $this->repositorio->registrarConfiguracionRecargo(
+                    $idEstadoCuenta,
+                    (int) $regla['idReglaCobro'],
+                    (string) $regla['tipoRecargo'],
+                    (string) $regla['valorRecargo']
+                );
+
                 $cobro = [
                     'idContrato' => $idContrato,
                     'idConcepto' => (int) $regla['idConcepto'],
                     'montoPrincipal' => $montoPrincipal
                 ];
 
-                // No mostrar como persistente un ID
-                // generado durante una prueba.
                 if ($confirmarCambios) {
                     $cobro['idEstadoCuenta'] = $idEstadoCuenta;
                 }
@@ -294,41 +327,56 @@ final class EjecucionAdeudosServicio
             }
 
             if ($confirmarCambios) {
-                // Modo real: guardar los cobros.
                 $this->repositorio
                     ->confirmarTransaccion();
             } else {
-                // Modo de prueba: deshacer todo.
+                // En los ensayos nunca se conservan cobros.
                 $this->repositorio
                     ->revertirTransaccion();
             }
 
         } catch (Throwable $error) {
-            // Ante cualquier error, revertir.
-            $this->repositorio
-                ->revertirTransaccion();
-
+            $this->repositorio->revertirTransaccion();
             throw $error;
         }
 
         return [
             'periodo' => $periodo,
             'modo' => $modo,
-
-            // En modo de prueba representa
-            // cobros ensayados, no persistidos.
             'creados' => count($creados),
-
-            'omitidosPorDuplicado' => count(
-                $omitidosPorDuplicado
-            ),
+            'omitidosPorDuplicado' => $omitidosPorDuplicado,
             'detalle' => $creados
         ];
     }
 
     /**
-     * Da prioridad a la regla específica
-     * y utiliza la general como alternativa.
+     * Valida la fecha máxima para la automatización.
+     */
+    private function validarFechaMaximaEmision(
+        string $periodo,
+        string $fechaMaximaEmision,
+        string $fechaActual
+    ): void {
+        $fecha = DateTimeImmutable::createFromFormat(
+            '!Y-m-d',
+            $fechaMaximaEmision
+        );
+
+        if (
+            $fecha === false
+            || $fecha->format('Y-m-d') !== $fechaMaximaEmision
+            || substr($fechaMaximaEmision, 0, 7) !== $periodo
+            || $fechaMaximaEmision > $fechaActual
+        ) {
+            throw new InvalidArgumentException(
+                'La fecha máxima debe pertenecer al periodo actual '
+                . 'y no puede ser futura.'
+            );
+        }
+    }
+
+    /**
+     * Selecciona la regla específica o la general.
      *
      * @param array<int, array<string, mixed>> $reglas
      */
@@ -343,8 +391,7 @@ final class EjecucionAdeudosServicio
 
             if (isset($porAlcance[$alcance])) {
                 throw new DomainException(
-                    'Existen dos reglas activas '
-                    . "para el alcance {$alcance}."
+                    "Existen dos reglas activas para el alcance {$alcance}."
                 );
             }
 
@@ -357,8 +404,7 @@ final class EjecucionAdeudosServicio
     }
 
     /**
-     * Ajusta los días al último día
-     * disponible del mes.
+     * Ajusta el día configurado al mes correspondiente.
      */
     private function fechaDelPeriodo(
         string $periodo,
@@ -397,7 +443,7 @@ final class EjecucionAdeudosServicio
     }
 
     /**
-     * Normaliza los importes DECIMAL(12,2).
+     * Normaliza importes DECIMAL(12,2).
      */
     private function normalizarMonto(
         mixed $monto

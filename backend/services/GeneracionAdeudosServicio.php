@@ -23,11 +23,35 @@ final class GeneracionAdeudosServicio
     /**
      * Simula los adeudos del periodo sin escribir en MySQL.
      *
+     * Si se indica $fechaMaximaEmision, las cuotas con un
+     * corte posterior se marcan como corte_pendiente.
+     *
+     * Sin ese argumento se conserva el comportamiento
+     * de la pantalla administrativa.
+     *
      * @return array<string, mixed>
      */
-    public function simularPeriodo(string $periodo): array
-    {
+    public function simularPeriodo(
+        string $periodo,
+        ?string $fechaMaximaEmision = null
+    ): array {
         $fechaBase = $this->validarPeriodo($periodo);
+
+        if ($fechaMaximaEmision !== null) {
+            $fechaValidada = DateTimeImmutable::createFromFormat(
+                '!Y-m-d',
+                $fechaMaximaEmision
+            );
+
+            if (
+                $fechaValidada === false
+                || $fechaValidada->format('Y-m-d') !== $fechaMaximaEmision
+            ) {
+                throw new InvalidArgumentException(
+                    'La fecha máxima de emisión debe tener el formato YYYY-MM-DD.'
+                );
+            }
+        }
 
         $hoy = new DateTimeImmutable(
             'today',
@@ -79,8 +103,8 @@ final class GeneracionAdeudosServicio
             $diaCorte = (int) $regla['diaCorte'];
             $diaLimitePago = (int) $regla['diaLimitePago'];
 
-            // El límite debe ser igual o posterior
-            // al corte dentro del mismo mes.
+            // La fecha límite debe ser igual
+            // o posterior al día de corte.
             if ($diaLimitePago < $diaCorte) {
                 $detalle[] = [
                     'idContrato' => $idContrato,
@@ -111,8 +135,6 @@ final class GeneracionAdeudosServicio
                 $regla['montoCuota']
             );
 
-            // Datos que utilizaremos para mostrar
-            // el detalle en la pantalla React.
             $registro = [
                 'idContrato' => $idContrato,
                 'idUnidad' => $idUnidad,
@@ -133,10 +155,7 @@ final class GeneracionAdeudosServicio
                 : (string) $contrato['fechaFin'];
 
             // El contrato debe estar vigente
-            // en la fecha del corte.
-            //
-            // Si comienza después del corte,
-            // no recibe mantenimiento ese mes.
+            // durante su fecha de corte.
             if (
                 $fechaInicio > $fechaEmision
                 || (
@@ -153,9 +172,8 @@ final class GeneracionAdeudosServicio
                 continue;
             }
 
-            // Buscar cualquier mantenimiento del
-            // contrato y periodo, aunque utilice
-            // un concepto de cobro diferente.
+            // Comprobar mantenimientos existentes,
+            // incluso si utilizan otro concepto.
             $existeCobro = $this->repositorio
                 ->existeCobroMantenimiento(
                     $idContrato,
@@ -172,8 +190,7 @@ final class GeneracionAdeudosServicio
                 continue;
             }
 
-            // No permitir nuevas generaciones
-            // para meses anteriores.
+            // No permitir generación retroactiva.
             if ($periodo < $periodoActual) {
                 $registro['resultado'] = 'periodo_pasado';
                 $registro['motivo'] =
@@ -184,8 +201,24 @@ final class GeneracionAdeudosServicio
                 continue;
             }
 
-            // Evitar que un cobro nuevo nazca
-            // con su fecha límite ya vencida.
+            // NUEVO: comprobar si ya llegó el corte.
+            //
+            // Se utiliza exclusivamente cuando
+            // recibimos una fecha máxima de emisión.
+            if (
+                $fechaMaximaEmision !== null
+                && $fechaEmision > $fechaMaximaEmision
+            ) {
+                $registro['resultado'] = 'corte_pendiente';
+                $registro['motivo'] =
+                    'Aún no llega la fecha de corte configurada.';
+
+                $detalle[] = $registro;
+                $omitidos++;
+                continue;
+            }
+
+            // No generar cuotas ya vencidas.
             if ($fechaLimitePago < $fechaActual) {
                 $registro['resultado'] = 'plazo_vencido';
                 $registro['motivo'] =
@@ -196,7 +229,7 @@ final class GeneracionAdeudosServicio
                 continue;
             }
 
-            // El contrato cumple todas las reglas.
+            // El contrato puede recibir su adeudo.
             $registro['resultado'] = 'generable';
             $registro['motivo'] =
                 'El contrato puede recibir el adeudo sin recargo inicial.';
@@ -218,7 +251,7 @@ final class GeneracionAdeudosServicio
     }
 
     /**
-     * Valida el formato YYYY-MM.
+     * Valida el periodo YYYY-MM.
      */
     private function validarPeriodo(
         string $periodo
@@ -252,7 +285,7 @@ final class GeneracionAdeudosServicio
     }
 
     /**
-     * Organiza las reglas activas por alcance.
+     * Organiza reglas por alcance.
      *
      * @param array<int, array<string, mixed>> $reglas
      * @return array<string, array<string, mixed>>
@@ -291,13 +324,8 @@ final class GeneracionAdeudosServicio
     }
 
     /**
-     * Calcula una fecha dentro del periodo.
-     *
-     * Si el día configurado no existe,
-     * utiliza el último día del mes.
-     *
-     * Ejemplo:
-     * 2027-02, día 31 => 2027-02-28.
+     * Calcula una fecha válida dentro del mes.
+     * Si el día no existe, utiliza el último.
      */
     private function calcularFecha(
         DateTimeImmutable $fechaBase,
