@@ -182,27 +182,47 @@ try {
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
     }
-    $rutaClave = dirname(__DIR__)
-        . '/config/autenticacion.local.php';
-    if (!is_file($rutaClave)) {
+    // Railway: usar la clave JWT proporcionada como variable privada.
+    // Desarrollo local: conservar el archivo privado existente.
+    // En Railway nunca permitir volver silenciosamente al archivo local.
+    $claveJwtEntorno = getenv('ALKIRA_CLAVE_JWT');
+    if ($claveJwtEntorno !== false) {
+        $claveJwt = $claveJwtEntorno;
+    } else {
+        if (getenv('RAILWAY_ENVIRONMENT') !== false) {
+            throw new RuntimeException(
+                'Falta la variable privada ALKIRA_CLAVE_JWT en Railway.'
+            );
+        }
+
+        $rutaClave = dirname(__DIR__) . '/config/autenticacion.local.php';
+        if (!is_file($rutaClave)) {
+            throw new RuntimeException(
+                'Falta la configuración de autenticación local.'
+            );
+        }
+        $configuracion = require $rutaClave;
+        if (!is_array($configuracion)) {
+            throw new RuntimeException(
+                'La configuración de autenticación local es inválida.'
+            );
+        }
+        $claveJwt = $configuracion['claveJwt'] ?? null;
+    }
+
+    if (
+        !is_string($claveJwt)
+        || strlen($claveJwt) < 32
+        || trim($claveJwt) === ''
+    ) {
         throw new RuntimeException(
-            'Falta la configuración de autenticación.'
+            'La clave JWT debe ser válida y tener al menos 32 caracteres.'
         );
     }
-    $configuracion = require $rutaClave;
-    if (
-        !is_array($configuracion) ||
-        !is_string($configuracion['claveJwt'] ?? null) ||
-        $configuracion['claveJwt'] === ''
-    ) {
-        throw new RuntimeException('La configuración de autenticación es inválida.');
-    }
+
     $conexion = Conexion::obtenerConexion();
     $repositorio = new UsuariosRepositorio($conexion);
-    $servicio = new AutenticacionServicio(
-        $repositorio,
-        $configuracion['claveJwt']
-    );
+    $servicio = new AutenticacionServicio($repositorio, $claveJwt);
     $controlador = new AutenticacionControlador($servicio);
 
     // HU04.1 - Descarga protegida del recibo desde Android.
