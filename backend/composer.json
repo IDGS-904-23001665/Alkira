@@ -1,0 +1,12 @@
+{
+  "name": "alkira/api",
+  "description": "API REST PHP de ALKIRA",
+  "type": "project",
+  "require": {
+    "php": ">=8.2 <9.0",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
+    "ext-json": "*",
+    "ext-mbstring": "*"
+  }
+}
