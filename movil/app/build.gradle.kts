@@ -11,7 +11,7 @@ android {
     defaultConfig {
         applicationId = if (providers.gradleProperty("alkiraPruebas").orNull == "true")
             "com.alkira.movil.pruebas" else "com.alkira.movil"
-        val apiUrl = providers.gradleProperty("alkiraApiUrl").orElse("http://10.0.2.2:8000").get()
+        val apiUrl = providers.gradleProperty("alkiraApiUrl").orElse("https://api-php-production-0578dc22.up.railway.app").get()
         // Valores públicos de Firebase, guardados por desarrollador fuera de Git.
         fun configCadena(propiedad: String, nombre: String) {
             val valor=providers.gradleProperty(propiedad).orElse("").get()
