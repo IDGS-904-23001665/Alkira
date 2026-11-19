@@ -7,6 +7,7 @@ header('X-Content-Type-Options: nosniff');
 require_once dirname(__DIR__) . '/config/Conexion.php';
 require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
 require_once dirname(__DIR__) . '/controllers/KddControlador.php';
+require_once dirname(__DIR__) . '/controllers/KddMovilControlador.php';
 require_once dirname(__DIR__) . '/repos/ComprobantesRepositorio.php';
 require_once dirname(__DIR__) . '/repos/ConciliacionRepositorio.php';
 require_once dirname(__DIR__) . '/controllers/ConciliacionControlador.php';
@@ -168,6 +169,7 @@ try {
         ['GET', '/api/kdd/financiero'],
         ['GET', '/api/kdd/operativo'],
         ['GET', '/api/kdd/reportes'],
+        ['GET', '/api/kdd/movil/resumen'],
     ];
     $rutaAdeudos = $ruta === '/api/adeudos/pendientes' && $metodo === 'GET';
     $rutaHistorialContratos = $metodo === 'GET' && is_string($ruta) && (
@@ -405,6 +407,27 @@ try {
         (new ConciliacionControlador(new ConciliacionRepositorio($conexion)))->procesar($metodo, $ruta, $usuario);
         exit;
     }
+
+
+
+    // ============================================
+    // MODULO 8 - METRICAS PERSONALES MOVILES
+    // ============================================
+    if (
+        $metodo === 'GET'
+        && $ruta === '/api/kdd/movil/resumen'
+    ) {
+        $controladorKddMovil = new KddMovilControlador(
+            $conexion,
+            $servicio
+        );
+
+        $controladorKddMovil->consultar();
+        exit;
+    }
+
+
+
     // ============================================
     // RUTAS DEL MODULO KDD
     // ============================================

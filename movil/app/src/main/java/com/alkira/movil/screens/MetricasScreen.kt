@@ -344,6 +344,9 @@ fun MetricasScreen(
                 pagos = pagosAprobados
             )
 
+            // Información adicional KDD
+            KddConsumoAsistenciaSection()
+
             // Historial
             Card(
                 modifier = Modifier.fillMaxWidth(),
