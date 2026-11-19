@@ -6,6 +6,8 @@ header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 require_once dirname(__DIR__) . '/config/Conexion.php';
 require_once dirname(__DIR__) . '/controllers/AutenticacionControlador.php';
+require_once dirname(__DIR__) . '/controllers/ChatbotAdminControlador.php';
+require_once dirname(__DIR__) . '/controllers/ChatbotMovilControlador.php';
 require_once dirname(__DIR__) . '/controllers/KddControlador.php';
 require_once dirname(__DIR__) . '/controllers/KddMovilControlador.php';
 require_once dirname(__DIR__) . '/repos/ComprobantesRepositorio.php';
@@ -30,6 +32,32 @@ require_once dirname(__DIR__) . '/controllers/ReglasCobroControlador.php';
 require_once dirname(__DIR__) . '/controllers/GeneracionAdeudosControlador.php';
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$rutaChatbotAdmin = is_string($ruta) && (
+    in_array($ruta, [
+        '/api/chatbot-admin/faqs',
+        '/api/chatbot-admin/probar',
+        '/api/chatbot-admin/conversaciones',
+        '/api/chatbot-admin/auditoria'
+    ], true)
+    || preg_match(
+        '#^/api/chatbot-admin/faqs/[1-9][0-9]*$#D',
+        $ruta
+    ) === 1
+    || preg_match(
+        '#^/api/chatbot-admin/conversaciones/[1-9][0-9]*/mensajes$#D',
+        $ruta
+    ) === 1
+);
+
+
+$rutaChatbotMovil = is_string($ruta) && (
+    $ruta === '/api/chatbot/mensaje'
+    || $ruta === '/api/chatbot/conversaciones'
+    || preg_match(
+        '#^/api/chatbot/conversaciones/[1-9][0-9]*/mensajes$#D',
+        $ruta
+    ) === 1
+);
 $rutaHu01 = is_string($ruta) && (
     preg_match('#^/api/inmuebles(?:/[1-9][0-9]*(?:/unidades)?)?$#D', $ruta) === 1
     || preg_match('#^/api/unidades/[1-9][0-9]*(?:/asignaciones)?$#D', $ruta) === 1
@@ -179,7 +207,7 @@ try {
     );
     // HU01 móvil: consulta de vivienda del usuario autenticado.
     $rutaMiVivienda = $metodo === 'GET' && $ruta === '/api/movil/mi-vivienda';
-    if (!$rutaReciboMovil && !$rutaHu07 && !$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !$rutaMiVivienda && !$rutaContratosAdministrativos && !$rutaReglasCobro && !$rutaSimulacionAdeudos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
+    if (!$rutaChatbotMovil && !$rutaChatbotAdmin && !$rutaReciboMovil && !$rutaHu07 && !$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !$rutaMiVivienda && !$rutaContratosAdministrativos && !$rutaReglasCobro && !$rutaSimulacionAdeudos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -226,6 +254,82 @@ try {
     $repositorio = new UsuariosRepositorio($conexion);
     $servicio = new AutenticacionServicio($repositorio, $claveJwt);
     $controlador = new AutenticacionControlador($servicio);
+
+
+    // ============================================
+    // MODULO 9 - ASISTENTE VIRTUAL MOVIL
+    // ============================================
+    if ($rutaChatbotMovil) {
+        $cabecera = $_SERVER['HTTP_AUTHORIZATION']
+            ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+            ?? '';
+
+        $tokenMovil = null;
+
+        if (
+            is_string($cabecera)
+            && preg_match(
+                '/^Bearer ([A-Za-z0-9_.-]+)$/iD',
+                trim($cabecera),
+                $partes
+            ) === 1
+        ) {
+            $tokenMovil = $partes[1];
+        }
+
+        $usuarioMovil = $servicio->verificarTokenMovil(
+            $tokenMovil
+        );
+
+        if ($usuarioMovil === null) {
+            http_response_code(401);
+
+            echo json_encode([
+                'mensaje' => 'Sesión móvil inválida o vencida.'
+            ], JSON_UNESCAPED_UNICODE);
+
+            exit;
+        }
+
+        $controladorChatbot = new ChatbotMovilControlador(
+            $conexion
+        );
+
+        $controladorChatbot->procesar(
+            $metodo,
+            $ruta,
+            $usuarioMovil
+        );
+
+        exit;
+    }
+
+
+// HU09.2: Administracion web del chatbot ALKIRA
+if ($rutaChatbotAdmin) {
+    $usuarioAdmin = $servicio->verificarTokenWeb(
+        $_COOKIE['alkira_token'] ?? null
+    );
+
+    if ($usuarioAdmin === null) {
+        http_response_code(401);
+
+        echo json_encode([
+            'mensaje' => 'Inicia sesión para administrar el chatbot.'
+        ]);
+
+        exit;
+    }
+
+    (new ChatbotAdminControlador($conexion))->procesar(
+        $metodo,
+        $ruta,
+        $usuarioAdmin
+    );
+
+    exit;
+}
+
 
     // HU04.1 - Descarga protegida del recibo desde Android.
     if ($rutaReciboMovil) {

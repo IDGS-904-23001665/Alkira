@@ -11,6 +11,7 @@ import SeguridadQr from '../modules/accesosQr/SeguridadQr.jsx'
 import Incidencias from '../modules/incidencias/Incidencias.jsx'
 import Comunicados from '../modules/modulo7/Comunicados.jsx'
 import VotacionesAdmin from '../modules/modulo7/VotacionesAdmin.jsx'
+import ChatbotAdmin from '../modules/modulo9/ChatbotAdmin.jsx'
 
 import ContratosAdministrativos from '../modules/modulo2/ContratosAdministrativos.jsx'
 import ReglasCobro from '../modules/modulo2/ReglasCobro.jsx'
@@ -84,6 +85,7 @@ const PANTALLAS = {
   seguridad: SeguridadQr,
   incidencias: Incidencias,
   reportes: IndicadoresKdd,
+  chatbot: ChatbotAdmin,
   comunicados: Comunicados,
   votaciones: VotacionesAdmin,
 }

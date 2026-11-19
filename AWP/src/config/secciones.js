@@ -78,6 +78,13 @@ export const SECCIONES = [
     icono: 'grafica',
   },
   {
+    id: 'chatbot',
+    texto: 'Asistente virtual',
+    titulo: 'Administración del Asistente ALKIRA',
+    descripcion: 'Gestión de FAQs, reglas de respuesta y auditoría de conversaciones.',
+    icono: 'documento',
+  },
+  {
     id: 'seguridad',
     texto: 'Seguridad',
     titulo: 'Control de acceso',
