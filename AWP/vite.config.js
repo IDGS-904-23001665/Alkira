@@ -1,13 +1,17 @@
-
+// Ruta en ALKIRA: AWP/vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// Se usa MySQL local por defecto a través del backend PHP local.
+// Para probar contra Railway, definir ALKIRA_API_PROXY_TARGET al iniciar Vite.
+const destinoApi = process.env.ALKIRA_API_PROXY_TARGET || 'http://127.0.0.1:8000'
 
 export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: destinoApi,
         changeOrigin: true,
       },
     },
