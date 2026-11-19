@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/repos/KddRepositorio.php';
+require_once __DIR__ . '/KddPrediccionServicio.php';
 
 final class KddServicio
 {
@@ -193,6 +194,25 @@ public function consultarAnalisisFinancieroFiltrado(
 
     $seguimientoCartera = $this->evaluarSeguimientoCartera($senales);
 
+
+    // Prediccion de morosidad basada en historial anterior
+    // a la fecha de corte seleccionada.
+    $fechaCorte = $periodo !== null
+        ? $periodo . '-01'
+        : date('Y-m-d');
+
+    $registrosPrediccion = $this->repositorio
+        ->obtenerDatosPrediccion(
+            $idInmueble,
+            $fechaCorte
+        );
+
+    $prediccionMorosidad = KddPrediccionServicio::estimar(
+        $registrosPrediccion,
+        $fechaCorte
+    );
+
+
     $patrones = [];
 
     if ((float) $financiero['totalVencido'] > 0) {
@@ -235,6 +255,7 @@ public function consultarAnalisisFinancieroFiltrado(
         'mantenimiento' => $mantenimiento,
         'alertas' => $alertas,
         'seguimientoCartera' => $seguimientoCartera,
+        'prediccionMorosidad' => $prediccionMorosidad,
         'patrones' => $patrones,
 
         'limitePorLista' => 200,

@@ -1,107 +1,109 @@
-
-import { useEffect, useState } from 'react'
-import SeguimientoCarteraKdd from './SeguimientoCarteraKdd.jsx'
+import PrediccionMorosidadKdd from "./PrediccionMorosidadKdd.jsx";
+import { useEffect, useState } from "react";
+import SeguimientoCarteraKdd from "./SeguimientoCarteraKdd.jsx";
 
 const PAGOS = [
-  ['idPago', 'Pago'],
-  ['unidad', 'Unidad'],
-  ['periodo', 'Periodo'],
-  ['fechaPago', 'Fecha'],
-  ['monto', 'Monto'],
-  ['metodoPago', 'Método'],
-  ['estadoPago', 'Estado']
-]
+  ["idPago", "Pago"],
+  ["unidad", "Unidad"],
+  ["periodo", "Periodo"],
+  ["fechaPago", "Fecha"],
+  ["monto", "Monto"],
+  ["metodoPago", "Método"],
+  ["estadoPago", "Estado"],
+];
 
 const MANTENIMIENTO = [
-  ['idIncidencia', 'Incidencia'],
-  ['idTicket', 'Ticket'],
-  ['titulo', 'Descripción'],
-  ['categoria', 'Categoría'],
-  ['urgencia', 'Urgencia'],
-  ['fechaReporte', 'Reportada'],
-  ['estadoTicket', 'Estado del ticket'],
-  ['horasResolucion', 'Horas de resolución']
-]
+  ["idIncidencia", "Incidencia"],
+  ["idTicket", "Ticket"],
+  ["titulo", "Descripción"],
+  ["categoria", "Categoría"],
+  ["urgencia", "Urgencia"],
+  ["fechaReporte", "Reportada"],
+  ["estadoTicket", "Estado del ticket"],
+  ["horasResolucion", "Horas de resolución"],
+];
 
 const ALERTAS = [
-  ['unidad', 'Unidad'],
-  ['cuentasRegistradas', 'Cuentas'],
-  ['cuentasVencidas', 'Vencidas'],
-  ['saldoVencido', 'Saldo vencido'],
-  ['nivelAlerta', 'Alerta']
-]
+  ["unidad", "Unidad"],
+  ["cuentasRegistradas", "Cuentas"],
+  ["cuentasVencidas", "Vencidas"],
+  ["saldoVencido", "Saldo vencido"],
+  ["nivelAlerta", "Alerta"],
+];
 
 const SEGUIMIENTO = [
-  ['unidad', 'Unidad'],
-  ['prioridad', 'Prioridad'],
-  ['puntuacion', 'Puntos'],
-  ['cuentasVencidas', 'Cuentas vencidas'],
-  ['periodosVencidos', 'Periodos vencidos'],
-  ['cuentasProximasAVencer', 'Próximas a vencer'],
-  ['saldoPendiente', 'Saldo pendiente'],
-  ['saldoVencido', 'Saldo vencido'],
-  ['razones', 'Señales detectadas']
-]
+  ["unidad", "Unidad"],
+  ["prioridad", "Prioridad"],
+  ["puntuacion", "Puntos"],
+  ["cuentasVencidas", "Cuentas vencidas"],
+  ["periodosVencidos", "Periodos vencidos"],
+  ["cuentasProximasAVencer", "Próximas a vencer"],
+  ["saldoPendiente", "Saldo pendiente"],
+  ["saldoVencido", "Saldo vencido"],
+  ["razones", "Señales detectadas"],
+];
+
+const COLUMNAS_PREDICCION = [
+  ["unidad", "Unidad"],
+  ["probabilidadAtraso", "Riesgo estimado (%)"],
+  ["nivel", "Nivel de riesgo"],
+  ["periodosAnalizados", "Periodos analizados"],
+  ["periodosConAtraso", "Periodos con atraso"],
+  ["periodosPuntuales", "Periodos puntuales"],
+  ["calidad", "Calidad de estimación"],
+];
 
 function texto(valor) {
-  return valor === null ||
-    valor === undefined ||
-    valor === ''
-    ? '—'
-    : String(valor)
+  return valor === null || valor === undefined || valor === ""
+    ? "—"
+    : String(valor);
 }
 
 function descargarCsv(nombre, columnas, filas) {
   const celda = (valor) => {
-    const original = String(valor ?? '')
+    const original = String(valor ?? "");
 
-    const seguro = /^\s*[=+\-@]/.test(original)
-      ? `'${original}`
-      : original
+    const seguro = /^\s*[=+\-@]/.test(original) ? `'${original}` : original;
 
-    return `"${seguro.replaceAll('"', '""')}"`
-  }
+    return `"${seguro.replaceAll('"', '""')}"`;
+  };
 
   const lineas = [
-    columnas.map(([, titulo]) => celda(titulo)).join(','),
+    columnas.map(([, titulo]) => celda(titulo)).join(","),
     ...filas.map((fila) =>
-      columnas.map(([campo]) =>
-        celda(fila[campo])
-      ).join(',')
-    )
-  ]
+      columnas.map(([campo]) => celda(fila[campo])).join(","),
+    ),
+  ];
 
-  const blob = new Blob(
-    ['\uFEFF' + lineas.join('\r\n')],
-    {
-      type: 'text/csv;charset=utf-8'
-    }
-  )
+  const blob = new Blob(["\uFEFF" + lineas.join("\r\n")], {
+    type: "text/csv;charset=utf-8",
+  });
 
-  const url = URL.createObjectURL(blob)
-  const enlace = document.createElement('a')
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
 
-  enlace.href = url
-  enlace.download = nombre
+  enlace.href = url;
+  enlace.download = nombre;
 
-  document.body.appendChild(enlace)
-  enlace.click()
-  enlace.remove()
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
 
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function escaparHtml(valor) {
   return texto(valor).replace(
     /[&<>"']/g,
-    (c) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    })[c]
-  )
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c],
+  );
 }
 
 function imprimirInforme(reporte, periodo, inmueble) {
@@ -111,30 +113,40 @@ function imprimirInforme(reporte, periodo, inmueble) {
     <table>
       <thead>
         <tr>
-          ${columnas.map(([, tituloColumna]) =>
-            `<th>${escaparHtml(tituloColumna)}</th>`
-          ).join('')}
+          ${columnas
+            .map(
+              ([, tituloColumna]) => `<th>${escaparHtml(tituloColumna)}</th>`,
+            )
+            .join("")}
         </tr>
       </thead>
 
       <tbody>
-        ${filas.map((fila) => `
+        ${filas
+          .map(
+            (fila) => `
           <tr>
-            ${columnas.map(([campo]) =>
-              `<td>${escaparHtml(fila[campo])}</td>`
-            ).join('')}
+            ${columnas
+              .map(([campo]) => `<td>${escaparHtml(fila[campo])}</td>`)
+              .join("")}
           </tr>
-        `).join('')}
+        `,
+          )
+          .join("")}
       </tbody>
     </table>
-  `
+  `;
 
-  const hallazgos = reporte.patrones.map((patron) => `
+  const hallazgos = reporte.patrones
+    .map(
+      (patron) => `
     <li>
       <strong>${escaparHtml(patron.titulo)}</strong>:
       ${escaparHtml(patron.detalle)}
     </li>
-  `).join('')
+  `,
+    )
+    .join("");
 
   const html = `
     <!doctype html>
@@ -191,73 +203,71 @@ function imprimirInforme(reporte, periodo, inmueble) {
         <h1>ALKIRA — Informe KDD</h1>
 
         <p>
-          Inmueble: ${escaparHtml(inmueble || 'Todos')}
-          · Periodo: ${escaparHtml(periodo || 'Todos')}
+          Inmueble: ${escaparHtml(inmueble || "Todos")}
+          · Periodo: ${escaparHtml(periodo || "Todos")}
         </p>
 
         <p>
-          Reporte descriptivo, máximo 200 filas por tabla.
-          No es una predicción de IA.
+        Reporte KDD, máximo 200 filas por tabla.
+        Incluye análisis descriptivo y una estimación
+        estadística exploratoria de morosidad.
         </p>
 
         <h2>Hallazgos</h2>
 
         <ul>
-          ${hallazgos || '<li>Sin hallazgos.</li>'}
+          ${hallazgos || "<li>Sin hallazgos.</li>"}
         </ul>
 
-        ${reporte.seguimientoCartera
-          ? tabla(
-              'Prioridad de seguimiento',
-              SEGUIMIENTO,
-              reporte.seguimientoCartera.unidades ?? []
-            )
-          : ''
+        ${
+          reporte.seguimientoCartera
+            ? tabla(
+                "Prioridad de seguimiento",
+                SEGUIMIENTO,
+                reporte.seguimientoCartera.unidades ?? [],
+              )
+            : ""
         }
 
-        ${tabla('Pagos', PAGOS, reporte.pagos)}
+        ${tabla("Pagos", PAGOS, reporte.pagos)}
 
-        ${tabla(
-          'Mantenimiento',
-          MANTENIMIENTO,
-          reporte.mantenimiento
-        )}
+        ${tabla("Mantenimiento", MANTENIMIENTO, reporte.mantenimiento)}
 
-        ${tabla(
-          'Alertas de morosidad',
-          ALERTAS,
-          reporte.alertas
-        )}
+          ${
+            reporte.prediccionMorosidad
+              ? tabla(
+                  "Predicción temprana de morosidad (modelo estadístico exploratorio)",
+                  COLUMNAS_PREDICCION,
+                  reporte.prediccionMorosidad.unidades,
+                )
+              : ""
+          }
+
+        ${tabla("Alertas de morosidad", ALERTAS, reporte.alertas)}
       </body>
     </html>
-  `
+  `;
 
-  const ventana = window.open('', '_blank')
+  const ventana = window.open("", "_blank");
 
   if (!ventana) {
     window.alert(
-      'Permite ventanas emergentes para localhost y vuelve a intentarlo.'
-    )
-    return
+      "Permite ventanas emergentes para localhost y vuelve a intentarlo.",
+    );
+    return;
   }
 
-  ventana.document.open()
-  ventana.document.write(html)
-  ventana.document.close()
+  ventana.document.open();
+  ventana.document.write(html);
+  ventana.document.close();
 
-  ventana.focus()
-  ventana.print()
+  ventana.focus();
+  ventana.print();
 }
 
-function TablaKdd({
-  titulo,
-  columnas,
-  filas,
-  archivo
-}) {
+function TablaKdd({ titulo, columnas, filas, archivo }) {
   return (
     <div className="mt-3">
-
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h4 className="h6 fw-bold mb-0">
           {titulo} ({filas.length})
@@ -266,9 +276,7 @@ function TablaKdd({
         <button
           type="button"
           className="btn btn-outline-primary btn-sm"
-          onClick={() =>
-            descargarCsv(archivo, columnas, filas)
-          }
+          onClick={() => descargarCsv(archivo, columnas, filas)}
         >
           Descargar CSV
         </button>
@@ -295,9 +303,7 @@ function TablaKdd({
               {filas.map((fila, indice) => (
                 <tr key={`${archivo}-${indice}`}>
                   {columnas.map(([campo]) => (
-                    <td key={campo}>
-                      {texto(fila[campo])}
-                    </td>
+                    <td key={campo}>{texto(fila[campo])}</td>
                   ))}
                 </tr>
               ))}
@@ -306,80 +312,67 @@ function TablaKdd({
         </div>
       )}
     </div>
-  )
+  );
 }
 
-function Apartado({
-  titulo,
-  cantidad,
-  children,
-  abierto = false
-}) {
+function Apartado({ titulo, cantidad, children, abierto = false }) {
   return (
-    <details
-      className="card border-0 shadow-sm mb-3"
-      open={abierto}
-    >
-      <summary
-        className="card-body fw-bold"
-        style={{ cursor: 'pointer' }}
-      >
+    <details className="card border-0 shadow-sm mb-3" open={abierto}>
+      <summary className="card-body fw-bold" style={{ cursor: "pointer" }}>
         {titulo} · {cantidad}
       </summary>
 
-      <div className="px-3 pb-3">
-        {children}
-      </div>
+      <div className="px-3 pb-3">{children}</div>
     </details>
-  )
+  );
 }
 
 function HistorialesKdd({ idInmueble, periodo }) {
-  const [reporte, setReporte] = useState(null)
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState('')
+  const [reporte, setReporte] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const controlador = new AbortController()
+    const controlador = new AbortController();
 
     async function cargar() {
-      setCargando(true)
-      setError('')
-      setReporte(null)
+      setCargando(true);
+      setError("");
+      setReporte(null);
 
-      const parametros = new URLSearchParams()
+      const parametros = new URLSearchParams();
 
       if (idInmueble) {
-        parametros.set('idInmueble', idInmueble)
+        parametros.set("idInmueble", idInmueble);
       }
 
       if (periodo) {
-        parametros.set('periodo', periodo)
+        parametros.set("periodo", periodo);
       }
 
-      const consulta = parametros.toString()
+      const consulta = parametros.toString();
 
       try {
         const respuesta = await fetch(
-          `/api/kdd/reportes${consulta ? `?${consulta}` : ''}`,
+          `/api/kdd/reportes${consulta ? `?${consulta}` : ""}`,
           {
-            credentials: 'same-origin',
+            credentials: "same-origin",
             headers: {
-              Accept: 'application/json'
+              Accept: "application/json",
             },
-            signal: controlador.signal
-          }
-        )
+            signal: controlador.signal,
+          },
+        );
 
         if (!respuesta.ok) {
           throw new Error(
             respuesta.status === 401
-              ? 'Tu sesión venció. Inicia sesión nuevamente.'
-              : `No fue posible consultar los reportes (HTTP ${respuesta.status}).`
-          )
+              ? "Tu sesión venció. Inicia sesión nuevamente."
+              : `No fue posible consultar los reportes (HTTP ${respuesta.status}).`,
+          );
         }
 
-        const datos = await respuesta.json()
+        const datos = await respuesta.json();
 
         if (
           !Array.isArray(datos.pagos) ||
@@ -387,38 +380,33 @@ function HistorialesKdd({ idInmueble, periodo }) {
           !Array.isArray(datos.alertas) ||
           !Array.isArray(datos.patrones)
         ) {
-          throw new Error(
-            'La API devolvió un reporte incompleto.'
-          )
+          throw new Error("La API devolvió un reporte incompleto.");
         }
 
         if (!controlador.signal.aborted) {
-          setReporte(datos)
+          setReporte(datos);
         }
       } catch (errorConsulta) {
         if (!controlador.signal.aborted) {
-          setError(errorConsulta.message)
+          setError(errorConsulta.message);
         }
       } finally {
         if (!controlador.signal.aborted) {
-          setCargando(false)
+          setCargando(false);
         }
       }
     }
 
-    cargar()
+    cargar();
 
-    return () => controlador.abort()
-  }, [idInmueble, periodo])
+    return () => controlador.abort();
+  }, [idInmueble, periodo]);
 
   return (
     <section aria-label="Reportes KDD">
-
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
-          <h3 className="h5 fw-bold mb-1">
-            Reportes y seguimiento
-          </h3>
+          <h3 className="h5 fw-bold mb-1">Reportes y seguimiento</h3>
 
           <p className="small text-secondary mb-0">
             Abre solamente la información que necesites.
@@ -429,9 +417,7 @@ function HistorialesKdd({ idInmueble, periodo }) {
           <button
             className="btn btn-primary btn-sm"
             type="button"
-            onClick={() =>
-              imprimirInforme(reporte, periodo, idInmueble)
-            }
+            onClick={() => imprimirInforme(reporte, periodo, idInmueble)}
           >
             Imprimir / Guardar PDF
           </button>
@@ -439,9 +425,7 @@ function HistorialesKdd({ idInmueble, periodo }) {
       </div>
 
       {cargando && (
-        <div className="alert alert-secondary">
-          Cargando reportes...
-        </div>
+        <div className="alert alert-secondary">Cargando reportes...</div>
       )}
 
       {error && (
@@ -459,15 +443,14 @@ function HistorialesKdd({ idInmueble, periodo }) {
             } unidades`}
             abierto
           >
-            <SeguimientoCarteraKdd
-              datos={reporte.seguimientoCartera}
-            />
+            <SeguimientoCarteraKdd datos={reporte.seguimientoCartera} />
+            <PrediccionMorosidadKdd datos={reporte.prediccionMorosidad} />
 
             {reporte.seguimientoCartera && (
               <details className="px-3 pb-2">
                 <summary
                   className="small fw-semibold"
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: "pointer" }}
                 >
                   Ver tabla completa y descargar CSV
                 </summary>
@@ -475,19 +458,14 @@ function HistorialesKdd({ idInmueble, periodo }) {
                 <TablaKdd
                   titulo="Prioridades por unidad"
                   columnas={SEGUIMIENTO}
-                  filas={
-                    reporte.seguimientoCartera.unidades ?? []
-                  }
+                  filas={reporte.seguimientoCartera.unidades ?? []}
                   archivo="kdd_prioridades_cobranza.csv"
                 />
               </details>
             )}
           </Apartado>
 
-          <Apartado
-            titulo="Pagos registrados"
-            cantidad={reporte.pagos.length}
-          >
+          <Apartado titulo="Pagos registrados" cantidad={reporte.pagos.length}>
             <TablaKdd
               titulo="Pagos"
               columnas={PAGOS}
@@ -531,12 +509,8 @@ function HistorialesKdd({ idInmueble, periodo }) {
             ) : (
               <ul className="mb-0">
                 {reporte.patrones.map((patron, indice) => (
-                  <li
-                    key={`${patron.tipo}-${indice}`}
-                    className="mb-2"
-                  >
-                    <strong>{patron.titulo}:</strong>{' '}
-                    {patron.detalle}
+                  <li key={`${patron.tipo}-${indice}`} className="mb-2">
+                    <strong>{patron.titulo}:</strong> {patron.detalle}
                   </li>
                 ))}
               </ul>
@@ -544,14 +518,15 @@ function HistorialesKdd({ idInmueble, periodo }) {
           </Apartado>
 
           <p className="text-secondary small">
-            Máximo {reporte.limitePorLista ?? 200} filas
-            por tabla. Las prioridades son reglas
-            descriptivas, no predicciones de IA.
+          Máximo {reporte.limitePorLista ?? 200} filas por tabla.
+          Las prioridades de cobranza son descriptivas.
+          La predicción de morosidad utiliza un modelo estadístico
+          basado en el historial de pagos.
           </p>
         </>
       )}
     </section>
-  )
+  );
 }
 
-export default HistorialesKdd
+export default HistorialesKdd;

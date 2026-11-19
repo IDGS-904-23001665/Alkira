@@ -336,6 +336,97 @@ SQL;
 }
 
 
+    public function obtenerDatosPrediccion(
+        ?int $idInmueble,
+        string $fechaCorte
+    ): array {
+        $sql = <<<'SQL'
+    WITH RECURSIVE inmueblesRelacionados AS (
+        SELECT id_inmueble
+        FROM inmuebles
+        WHERE id_inmueble = ?
+
+        UNION ALL
+
+        SELECT hijo.id_inmueble
+        FROM inmuebles hijo
+        INNER JOIN inmueblesRelacionados padre
+            ON hijo.id_inmueble_padre = padre.id_inmueble
+    )
+    SELECT
+        pu.id_unidad AS idUnidad,
+        pu.numero_unidad AS unidad,
+        ec.id_estado_cuenta AS idEstadoCuenta,
+        ec.periodo,
+        ec.fecha_limite_pago AS fechaLimitePago,
+        ec.monto_principal AS montoPrincipal,
+        COALESCE(SUM(CASE
+            WHEN p.estado = 'aprobado'
+            AND p.fecha_pago IS NOT NULL
+            AND DATE(p.fecha_pago) <= ec.fecha_limite_pago
+            THEN p.monto
+            ELSE 0
+        END), 0) AS pagadoATiempo
+    FROM propiedades_unidades pu
+    INNER JOIN contratos c
+        ON c.id_unidad = pu.id_unidad
+    AND c.estado_contrato = 'vigente'
+    LEFT JOIN estados_cuenta ec
+        ON ec.id_contrato = c.id_contrato
+    AND ec.estado <> 'cancelado'
+    AND ec.fecha_limite_pago < ?
+    AND ec.fecha_emision < ?
+    AND ec.monto_principal > 0
+    LEFT JOIN pagos_transacciones p
+        ON p.id_estado_cuenta = ec.id_estado_cuenta
+    WHERE pu.activo = 1
+    AND (
+        ? IS NULL
+        OR pu.id_inmueble IN (
+            SELECT id_inmueble FROM inmueblesRelacionados
+        )
+    )
+    GROUP BY
+        pu.id_unidad,
+        pu.numero_unidad,
+        ec.id_estado_cuenta,
+        ec.periodo,
+        ec.fecha_limite_pago,
+        ec.monto_principal
+    ORDER BY pu.numero_unidad, ec.fecha_limite_pago
+    SQL;
+
+        $sentencia = $this->conexion->prepare($sql);
+
+        $valores = [
+            $idInmueble,
+            $fechaCorte,
+            $fechaCorte,
+            $idInmueble
+        ];
+
+        foreach ($valores as $indice => $valor) {
+            $sentencia->bindValue(
+                $indice + 1,
+                $valor,
+                $valor === null
+                    ? PDO::PARAM_NULL
+                    : (is_int($valor)
+                        ? PDO::PARAM_INT
+                        : PDO::PARAM_STR)
+            );
+        }
+
+        $sentencia->execute();
+
+        try {
+            return $sentencia->fetchAll(PDO::FETCH_ASSOC);
+        } finally {
+            $sentencia->closeCursor();
+        }
+    }
+
+
 private function consultarListaKdd(
     string $procedimiento,
     ?int $idInmueble,
