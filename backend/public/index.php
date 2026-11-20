@@ -25,6 +25,7 @@ require_once dirname(__DIR__) . '/services/AutenticacionSolicitud.php';
 require_once dirname(__DIR__) . '/controllers/AccesosQrControlador.php';
 require_once dirname(__DIR__) . '/controllers/TicketsControlador.php';
 require_once dirname(__DIR__) . '/controllers/OrdenesTrabajoControlador.php';
+require_once dirname(__DIR__) . '/controllers/DispositivosTecnicosControlador.php';
 require_once dirname(__DIR__) . '/controllers/CierreMantenimientoControlador.php';
 require_once dirname(__DIR__) . '/controllers/Hu07Controlador.php';
 require_once dirname(__DIR__) . '/controllers/ContratosAdministrativosControlador.php';
@@ -85,6 +86,9 @@ $rutaOrdenesTrabajo = is_string($ruta) && (
     || ($metodo === 'POST'
         && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/asignar$#D', $ruta) === 1)
 );
+$rutaDispositivosTecnicos = is_string($ruta)
+    && $ruta === '/api/mantenimiento/dispositivos'
+    && in_array($metodo, ['POST', 'DELETE'], true);
 $rutaCierreMantenimiento = is_string($ruta) && (
     ($metodo === 'GET'
         && preg_match('#^/api/mantenimiento/tickets/[1-9][0-9]*/materiales$#D', $ruta) === 1)
@@ -207,7 +211,7 @@ try {
     );
     // HU01 móvil: consulta de vivienda del usuario autenticado.
     $rutaMiVivienda = $metodo === 'GET' && $ruta === '/api/movil/mi-vivienda';
-    if (!$rutaChatbotMovil && !$rutaChatbotAdmin && !$rutaReciboMovil && !$rutaHu07 && !$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !$rutaMiVivienda && !$rutaContratosAdministrativos && !$rutaReglasCobro && !$rutaSimulacionAdeudos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
+    if (!$rutaChatbotMovil && !$rutaChatbotAdmin && !$rutaReciboMovil && !$rutaHu07 && !$rutaConciliacion && !$rutaHu01 && !$rutaResidentes && !$rutaCierreMantenimiento && !$rutaOrdenesTrabajo && !$rutaDispositivosTecnicos && !$rutaTickets && !$rutaHu05 && !$rutaHu10 && !$rutaAdeudos && !$rutaHistorialContratos && !$rutaMiVivienda && !$rutaContratosAdministrativos && !$rutaReglasCobro && !$rutaSimulacionAdeudos && !in_array([$metodo, $ruta], $rutasAutenticacion, true) && !in_array([$metodo, $ruta], $rutasKdd, true)) {
         http_response_code(404);
         echo json_encode(['mensaje' => 'Ruta no encontrada.']);
         exit;
@@ -595,6 +599,39 @@ if ($rutaChatbotAdmin) {
             exit;
         }
         (new ResidentesControlador(new ResidentesServicio(new ResidentesRepositorio($conexion))))->procesar($metodo);
+        exit;
+    }
+    if ($rutaDispositivosTecnicos) {
+        $cabecera = $_SERVER['HTTP_AUTHORIZATION']
+            ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+            ?? '';
+
+        $tokenMovil = null;
+
+        if (
+            is_string($cabecera)
+            && strlen($cabecera) <= 4200
+            && preg_match(
+                '/^Bearer ([A-Za-z0-9_.-]+)$/iD',
+                trim($cabecera),
+                $coincidencias
+            ) === 1
+        ) {
+            $tokenMovil = $coincidencias[1];
+        }
+
+        $usuarioMovil = $servicio->verificarTokenMovil($tokenMovil);
+
+        if ($usuarioMovil === null) {
+            http_response_code(401);
+            echo json_encode(['mensaje' => 'Sesión móvil inválida o vencida.']);
+            exit;
+        }
+
+        (new DispositivosTecnicosControlador(
+            new DispositivosTecnicosRepositorio($conexion)
+        ))->procesar($metodo, $usuarioMovil);
+
         exit;
     }
     if ($rutaOrdenesTrabajo) {
