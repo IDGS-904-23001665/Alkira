@@ -78,12 +78,13 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 } else {
+                    val usuarioActual = usuarioAutenticado!!
                     AplicacionAutenticada(
-                        usuario = usuarioAutenticado!!,
+                        usuario = usuarioActual,
                         onCerrarSesion = {
                             // Quitar el token del dispositivo antes de cerrar la sesión.
                             alcance.launch {
-                                PushAlkira.salir(applicationContext)
+                                PushAlkira.salir(applicationContext, usuarioActual.tipoUsuario)
                                 SesionMovil.cerrar()
                                 usuarioAutenticado = null
                                 mensajeError = null
@@ -104,7 +105,9 @@ private fun AplicacionAutenticada(
     val contexto = LocalContext.current
     val solicitudPermiso =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* El centro de avisos sigue disponible aun sin permiso */ }
-    LaunchedEffect(usuario.idUsuario) { PushAlkira.registrar(contexto) }
+    LaunchedEffect(usuario.idUsuario, usuario.tipoUsuario) {
+        PushAlkira.registrar(contexto, usuario.tipoUsuario)
+    }
     LaunchedEffect(usuario.idUsuario) {
         if (PushAlkira.configurado() && Build.VERSION.SDK_INT >= 33) {
             solicitudPermiso.launch(Manifest.permission.POST_NOTIFICATIONS)
