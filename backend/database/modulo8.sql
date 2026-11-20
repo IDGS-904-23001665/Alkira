@@ -291,7 +291,7 @@ DELIMITER $$
 
 CREATE PROCEDURE sp_kdd_resumen_financiero_filtrado(
     IN pIdInmueble INT UNSIGNED,
-    IN pPeriodo VARCHAR(7)
+    IN pPeriodo VARCHAR(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 )
 BEGIN
 
@@ -368,7 +368,7 @@ DELIMITER $$
 
 CREATE PROCEDURE sp_kdd_tendencia_mensual_filtrada(
     IN pIdInmueble INT UNSIGNED,
-    IN pPeriodo VARCHAR(7)
+    IN pPeriodo VARCHAR(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 )
 BEGIN
 
@@ -453,7 +453,7 @@ DELIMITER $$
 
 CREATE PROCEDURE sp_kdd_resumen_operativo_filtrado(
     IN pIdInmueble INT UNSIGNED,
-    IN pPeriodo VARCHAR(7)
+    IN pPeriodo VARCHAR(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 )
 BEGIN
 
@@ -560,7 +560,7 @@ DELIMITER $$
 
 CREATE PROCEDURE sp_kdd_historial_pagos_filtrado(
     IN pIdInmueble INT UNSIGNED,
-    IN pPeriodo VARCHAR(7)
+    IN pPeriodo VARCHAR(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 )
 BEGIN
     WITH RECURSIVE inmueblesRelacionados AS (
@@ -622,7 +622,7 @@ DELIMITER $$
 
 CREATE PROCEDURE sp_kdd_historial_operativo_filtrado(
     IN pIdInmueble INT UNSIGNED,
-    IN pPeriodo VARCHAR(7)
+    IN pPeriodo VARCHAR(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 )
 BEGIN
     WITH RECURSIVE inmueblesRelacionados AS (
@@ -709,7 +709,7 @@ DELIMITER $$
 
 CREATE PROCEDURE sp_kdd_alertas_morosidad_filtradas(
     IN pIdInmueble INT UNSIGNED,
-    IN pPeriodo VARCHAR(7)
+    IN pPeriodo VARCHAR(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 )
 BEGIN
     WITH RECURSIVE inmueblesRelacionados AS (
