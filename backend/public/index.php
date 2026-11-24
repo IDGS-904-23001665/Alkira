@@ -163,7 +163,13 @@ $rutaSimulacionAdeudos = is_string($ruta) && (
 // HU04.1 - Descarga de recibo móvil con JWT Bearer.
 $rutaReciboMovil = $metodo === 'GET' && is_string($ruta)
     && preg_match('#^/api/pagos/[1-9][0-9]*/recibo-movil$#D', $ruta) === 1;
-$rutaResidentes = $ruta === '/api/incidencias/residentes';
+$rutaResidentes = is_string($ruta) && (
+    $ruta === '/api/incidencias/residentes'
+    || preg_match(
+        '#^/api/administracion/residentes(?:/[1-9][0-9]*(?:/reactivar)?)?$#D',
+        $ruta
+    ) === 1
+);
 // HU04.2: rutas adicionales de conciliación de pagos.
 $rutaConciliacion = ($metodo === 'GET' && in_array($ruta, ['/api/conciliacion', '/api/conciliacion/recibo'], true))
     || ($metodo === 'POST' && in_array($ruta, ['/api/conciliacion/aprobar', '/api/conciliacion/rechazar'], true));
@@ -587,20 +593,37 @@ if ($rutaChatbotAdmin) {
         exit;
     }
     if ($rutaResidentes) {
-        $usuario = $servicio->verificarTokenWeb($_COOKIE['alkira_token'] ?? null);
-        if ($usuario === null) {
-            http_response_code(401);
-            echo json_encode(['mensaje' => 'Sesion no valida o vencida.']);
-            exit;
-        }
-        if ($usuario['tipoUsuario'] !== 'administrador') {
-            http_response_code(403);
-            echo json_encode(['mensaje' => 'Solo administracion puede consultar residentes.']);
-            exit;
-        }
-        (new ResidentesControlador(new ResidentesServicio(new ResidentesRepositorio($conexion))))->procesar($metodo);
+    $usuario = $servicio->verificarTokenWeb(
+        $_COOKIE['alkira_token'] ?? null
+    );
+
+    if ($usuario === null) {
+        http_response_code(401);
+
+        echo json_encode([
+            'mensaje' => 'Sesión no válida o vencida.'
+        ]);
         exit;
     }
+
+    if (($usuario['tipoUsuario'] ?? null) !== 'administrador') {
+        http_response_code(403);
+
+        echo json_encode([
+            'mensaje' => 'Solo administración puede gestionar residentes.'
+        ]);
+        exit;
+    }
+
+    $controladorResidentes = new ResidentesControlador(
+        new ResidentesServicio(
+            new ResidentesRepositorio($conexion)
+        )
+    );
+
+    $controladorResidentes->procesar($metodo, $ruta);
+    exit;
+}
     if ($rutaDispositivosTecnicos) {
         $cabecera = $_SERVER['HTTP_AUTHORIZATION']
             ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']

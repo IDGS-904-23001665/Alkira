@@ -5,6 +5,7 @@ import PaginaPendiente from '../pages/PaginaPendiente.jsx'
 import Mantenimiento from '../modules/modulo6/Mantenimiento.jsx'
 import IndicadoresKdd from '../modules/modulo8/IndicadoresKdd.jsx'
 import Propiedades from '../modules/modulo1/Propiedades.jsx'
+import Residentes from '../modules/residentes/Residentes.jsx'
 import Comprobantes from '../pages/Comprobantes.jsx'
 import Conciliacion from '../modules/modulo4/Conciliacion.jsx'
 import SeguridadQr from '../modules/accesosQr/SeguridadQr.jsx'
@@ -78,6 +79,7 @@ function PagosAdministrativos({
 
 const PANTALLAS = {
   propiedades: Propiedades,
+  residentes: Residentes,
   pagos: PagosAdministrativos,
   mantenimiento: Mantenimiento,
   comprobantes: Comprobantes,
