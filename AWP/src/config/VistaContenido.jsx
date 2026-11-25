@@ -2,6 +2,7 @@
 import { useState } from 'react'
 
 import PaginaPendiente from '../pages/PaginaPendiente.jsx'
+import ResumenGeneral from '../modules/resumen/ResumenGeneral.jsx'
 import Mantenimiento from '../modules/modulo6/Mantenimiento.jsx'
 import IndicadoresKdd from '../modules/modulo8/IndicadoresKdd.jsx'
 import Propiedades from '../modules/modulo1/Propiedades.jsx'
@@ -78,6 +79,7 @@ function PagosAdministrativos({
 }
 
 const PANTALLAS = {
+  resumen: ResumenGeneral,
   propiedades: Propiedades,
   residentes: Residentes,
   pagos: PagosAdministrativos,

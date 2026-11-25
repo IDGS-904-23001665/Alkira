@@ -31,6 +31,7 @@ require_once dirname(__DIR__) . '/controllers/Hu07Controlador.php';
 require_once dirname(__DIR__) . '/controllers/ContratosAdministrativosControlador.php';
 require_once dirname(__DIR__) . '/controllers/ReglasCobroControlador.php';
 require_once dirname(__DIR__) . '/controllers/GeneracionAdeudosControlador.php';
+require_once dirname(__DIR__) . '/controllers/ResumenGeneralControlador.php';
 $ruta = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $rutaChatbotAdmin = is_string($ruta) && (
@@ -190,6 +191,7 @@ try {
         exit;
     }
     $rutasAutenticacion = [
+        ['GET', '/api/resumen-general'],
         ['POST', '/api/auth/login'],
         ['GET',  '/api/auth/yo'],
         ['POST', '/api/auth/salir'],
@@ -265,6 +267,20 @@ try {
     $servicio = new AutenticacionServicio($repositorio, $claveJwt);
     $controlador = new AutenticacionControlador($servicio);
 
+    if ($ruta === '/api/resumen-general' && $metodo === 'GET') {
+
+        $usuarioResumen = $servicio->verificarTokenWeb(
+            $_COOKIE['alkira_token'] ?? null
+        );
+
+        $controladorResumen = new ResumenGeneralControlador(
+            $conexion
+        );
+
+        $controladorResumen->consultar($usuarioResumen);
+
+        exit;
+    }
 
     // ============================================
     // MODULO 9 - ASISTENTE VIRTUAL MOVIL
@@ -315,30 +331,30 @@ try {
     }
 
 
-// HU09.2: Administracion web del chatbot ALKIRA
-if ($rutaChatbotAdmin) {
-    $usuarioAdmin = $servicio->verificarTokenWeb(
-        $_COOKIE['alkira_token'] ?? null
-    );
+    // HU09.2: Administracion web del chatbot ALKIRA
+    if ($rutaChatbotAdmin) {
+        $usuarioAdmin = $servicio->verificarTokenWeb(
+            $_COOKIE['alkira_token'] ?? null
+        );
 
-    if ($usuarioAdmin === null) {
-        http_response_code(401);
+        if ($usuarioAdmin === null) {
+            http_response_code(401);
 
-        echo json_encode([
-            'mensaje' => 'Inicia sesión para administrar el chatbot.'
-        ]);
+            echo json_encode([
+                'mensaje' => 'Inicia sesión para administrar el chatbot.'
+            ]);
+
+            exit;
+        }
+
+        (new ChatbotAdminControlador($conexion))->procesar(
+            $metodo,
+            $ruta,
+            $usuarioAdmin
+        );
 
         exit;
     }
-
-    (new ChatbotAdminControlador($conexion))->procesar(
-        $metodo,
-        $ruta,
-        $usuarioAdmin
-    );
-
-    exit;
-}
 
 
     // HU04.1 - Descarga protegida del recibo desde Android.
@@ -593,37 +609,37 @@ if ($rutaChatbotAdmin) {
         exit;
     }
     if ($rutaResidentes) {
-    $usuario = $servicio->verificarTokenWeb(
-        $_COOKIE['alkira_token'] ?? null
-    );
+        $usuario = $servicio->verificarTokenWeb(
+            $_COOKIE['alkira_token'] ?? null
+        );
 
-    if ($usuario === null) {
-        http_response_code(401);
+        if ($usuario === null) {
+            http_response_code(401);
 
-        echo json_encode([
-            'mensaje' => 'Sesión no válida o vencida.'
-        ]);
+            echo json_encode([
+                'mensaje' => 'Sesión no válida o vencida.'
+            ]);
+            exit;
+        }
+
+        if (($usuario['tipoUsuario'] ?? null) !== 'administrador') {
+            http_response_code(403);
+
+            echo json_encode([
+                'mensaje' => 'Solo administración puede gestionar residentes.'
+            ]);
+            exit;
+        }
+
+        $controladorResidentes = new ResidentesControlador(
+            new ResidentesServicio(
+                new ResidentesRepositorio($conexion)
+            )
+        );
+
+        $controladorResidentes->procesar($metodo, $ruta);
         exit;
     }
-
-    if (($usuario['tipoUsuario'] ?? null) !== 'administrador') {
-        http_response_code(403);
-
-        echo json_encode([
-            'mensaje' => 'Solo administración puede gestionar residentes.'
-        ]);
-        exit;
-    }
-
-    $controladorResidentes = new ResidentesControlador(
-        new ResidentesServicio(
-            new ResidentesRepositorio($conexion)
-        )
-    );
-
-    $controladorResidentes->procesar($metodo, $ruta);
-    exit;
-}
     if ($rutaDispositivosTecnicos) {
         $cabecera = $_SERVER['HTTP_AUTHORIZATION']
             ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
