@@ -1,0 +1,81 @@
+
+.resumen-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(260px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.resumen-general .hu01-panel {
+  height: 100%;
+  animation: none;
+  transition: none;
+  transform: none;
+}
+
+.resumen-general .hu01-indicadores {
+  margin-bottom: 22px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.resumen-general .hu01-indicador,
+.resumen-general .hu01-indicador:hover {
+  animation: none;
+  transition: none;
+  transform: none;
+  box-shadow: none;
+  cursor: default;
+}
+
+.resumen-general .hu01-tabla-contenedor {
+  max-height: 350px;
+  overflow: auto;
+}
+
+.resumen-general td {
+  font-size: 12px;
+}
+
+.resumen-general .hu01-accesos button {
+  animation: none;
+  transition: none;
+  transform: none;
+  box-shadow: none;
+}
+
+.resumen-general .hu01-accesos button:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.resumen-general .hu01-accesos button span {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.resumen-actualizacion {
+  margin-top: 18px;
+  font-size: 11px;
+  color: #8794aa;
+  text-align: right;
+}
+
+@media (max-width: 1000px) {
+  .resumen-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .resumen-general .hu01-indicadores {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 550px) {
+  .resumen-general .hu01-cabecera-pagina {
+    flex-wrap: wrap;
+  }
+
+  .resumen-general .hu01-indicadores {
+    grid-template-columns: 1fr;
+  }
+}
