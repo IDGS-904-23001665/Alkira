@@ -681,7 +681,10 @@ try {
             exit;
         }
         $controladorOrdenes = new OrdenesTrabajoControlador(
-            new OrdenesTrabajoServicio(new OrdenesTrabajoRepositorio($conexion))
+            new OrdenesTrabajoServicio(
+                new OrdenesTrabajoRepositorio($conexion),
+                new NotificacionInmediataHu06Servicio($conexion)
+            )
         );
         $controladorOrdenes->procesar($metodo, $ruta, $usuario);
         exit;

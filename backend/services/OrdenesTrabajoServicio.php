@@ -2,11 +2,14 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/repos/OrdenesTrabajoRepositorio.php';
+require_once __DIR__ . '/NotificacionInmediataHu06Servicio.php';
 
 final class OrdenesTrabajoServicio
 {
-    public function __construct(private OrdenesTrabajoRepositorio $repositorio)
-    {
+    public function __construct(
+        private OrdenesTrabajoRepositorio $repositorio,
+        private NotificacionInmediataHu06Servicio $servicioNotificaciones
+    ) {
     }
 
     public function listarTickets(): array
@@ -41,7 +44,7 @@ final class OrdenesTrabajoServicio
             throw new InvalidArgumentException('La fecha programada es inválida.');
         }
 
-        $idAsignacion = $this->repositorio->asignar(
+        $asignacionCreada = $this->repositorio->asignar(
             $idTicket,
             $idTecnico,
             trim($descripcionOrden),
@@ -49,11 +52,20 @@ final class OrdenesTrabajoServicio
             $idAdministrador
         );
 
+        // La orden ya quedó confirmada; un fallo FCM no debe deshacerla.
+        try {
+            $estadoNotificacion = $this->servicioNotificaciones
+                ->enviarPendiente((int) $asignacionCreada['idNotificacion']);
+        } catch (Throwable $error) {
+            error_log('HU06: envío inmediato no confirmado: ' . get_class($error));
+            $estadoNotificacion = 'no_confirmada';
+        }
+
         return [
-            'idAsignacion' => $idAsignacion,
+            'idAsignacion' => (int) $asignacionCreada['idAsignacion'],
             'idTicket' => $idTicket,
             'estadoTicket' => 'asignado',
-            'estadoNotificacion' => 'pendiente',
+            'estadoNotificacion' => $estadoNotificacion,
         ];
     }
 }

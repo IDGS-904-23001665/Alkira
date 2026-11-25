@@ -3,6 +3,13 @@ declare(strict_types=1);
 
 final class FcmHu06Servicio
 {
+    public function __construct(private int $tiempoMaximoSegundos = 30)
+    {
+        if ($tiempoMaximoSegundos < 1 || $tiempoMaximoSegundos > 30) {
+            throw new InvalidArgumentException('Tiempo de espera FCM inválido.');
+        }
+    }
+
     public function enviar(
         string $token,
         string $titulo,
@@ -168,8 +175,8 @@ final class FcmHu06Servicio
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POSTFIELDS => $cuerpo,
             CURLOPT_HTTPHEADER => $cabeceras,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => min(5, $this->tiempoMaximoSegundos),
+            CURLOPT_TIMEOUT => $this->tiempoMaximoSegundos,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_FOLLOWLOCATION => false
