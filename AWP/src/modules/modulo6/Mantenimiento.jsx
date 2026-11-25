@@ -245,7 +245,7 @@ export default function Mantenimiento() {
                 <textarea className="form-control" required minLength={8} maxLength={1500} rows={4} value={formulario.descripcionOrden} onChange={(evento) => setFormulario((actual) => ({ ...actual, descripcionOrden: evento.target.value }))}/>
               </label>
               {error && <div className="alert alert-danger mb-0" role="alert">{error}</div>}
-              <p className="alkira-mant-nota">Al confirmar, se registrará la orden y una notificación pendiente para el técnico. El envío push todavía no está configurado.</p>
+              <p className="alkira-mant-nota">Al confirmar, se guardará la orden y se intentará enviar la notificación al técnico de inmediato. Si no se entrega, se informará su estado.</p>
               <div className="alkira-mant-acciones">
                 <button type="button" className="btn btn-outline-secondary" onClick={() => setTicketSeleccionado(null)} disabled={guardando}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={guardando || tecnicos.length === 0}>{guardando ? 'Guardando…' : 'Crear y asignar orden'}</button>

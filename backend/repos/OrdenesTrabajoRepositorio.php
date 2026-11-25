@@ -78,7 +78,7 @@ final class OrdenesTrabajoRepositorio
         string $descripcionOrden,
         string $fechaProgramada,
         int $idAdministrador
-    ): int {
+    ): array {
         $this->conexion->beginTransaction();
         try {
             // Bloquear el ticket evita asignaciones simultáneas desde dos administradores.
@@ -163,6 +163,7 @@ final class OrdenesTrabajoRepositorio
                     $fechaProgramada
                 ),
             ]);
+            $idNotificacion = (int) $this->conexion->lastInsertId();
 
             $consulta = $this->conexion->prepare(
                 'INSERT INTO historial_actividades_kdd
@@ -181,7 +182,10 @@ final class OrdenesTrabajoRepositorio
             ]);
 
             $this->conexion->commit();
-            return $idAsignacion;
+            return [
+                'idAsignacion' => $idAsignacion,
+                'idNotificacion' => $idNotificacion,
+            ];
         } catch (Throwable $error) {
             if ($this->conexion->inTransaction()) {
                 $this->conexion->rollBack();

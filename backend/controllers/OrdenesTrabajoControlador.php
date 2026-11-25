@@ -64,8 +64,14 @@ final class OrdenesTrabajoControlador
                     $datos,
                     (int) ($usuario['idUsuario'] ?? 0)
                 );
+                $mensajeRespuesta = match ($asignacion['estadoNotificacion']) {
+                    'enviada' => 'Orden asignada. Firebase aceptó la notificación del técnico.',
+                    'pendiente' => 'Orden asignada. La notificación quedó pendiente para el worker.',
+                    'fallida' => 'Orden asignada. El envío push falló y requiere revisión.',
+                    default => 'Orden asignada. No se confirmó el envío de la notificación.',
+                };
                 $this->responder(201, [
-                    'mensaje' => 'Orden creada y asignada. Notificación pendiente de entrega.',
+                    'mensaje' => $mensajeRespuesta,
                     'asignacion' => $asignacion,
                 ]);
                 return;
