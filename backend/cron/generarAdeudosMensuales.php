@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * HU02.3 - Tarea local de generación mensual de adeudos.
+ * HU02.3 - Generación mensual de adeudos (local o Railway).
  *
  * Ejemplos:
  * php backend/cron/generarAdeudosMensuales.php --simular
@@ -40,40 +40,79 @@ if (
 }
 
 try {
-    // El proyecto utiliza MySQL local.
-    $rutaConfiguracion = dirname(__DIR__)
-        . '/config/baseDatos.local.php';
+    // La base local sigue siendo la opción predeterminada.
+    // Railway debe seleccionarse explícitamente.
+    $baseEsperada = getenv('ALKIRA_CRON_ADEUDOS_BASE_ESPERADA');
 
-    if (!is_file($rutaConfiguracion)) {
+    if ($baseEsperada === false || $baseEsperada === '') {
+        $baseEsperada = 'alkira';
+    }
+
+    if (!in_array($baseEsperada, ['alkira', 'railway'], true)) {
         throw new RuntimeException(
-            'No existe la configuración local de MySQL.'
+            'La base de datos esperada no está autorizada.'
         );
     }
 
-    $configuracion = require $rutaConfiguracion;
+    if ($baseEsperada === 'alkira') {
+        $rutaConfiguracion = dirname(__DIR__)
+            . '/config/baseDatos.local.php';
 
-    if (
-        !is_array($configuracion)
-        || !in_array(
-            $configuracion['servidor'] ?? null,
-            ['localhost', '127.0.0.1', '::1'],
-            true
-        )
-        || ($configuracion['baseDatos'] ?? null) !== 'alkira'
-    ) {
-        throw new RuntimeException(
-            'La tarea solo admite MySQL local: alkira.'
-        );
+        if (!is_file($rutaConfiguracion)) {
+            throw new RuntimeException(
+                'No existe la configuración local de MySQL.'
+            );
+        }
+
+        $configuracion = require $rutaConfiguracion;
+
+        if (
+            !is_array($configuracion)
+            || !in_array(
+                $configuracion['servidor'] ?? null,
+                ['localhost', '127.0.0.1', '::1'],
+                true
+            )
+            || ($configuracion['baseDatos'] ?? null) !== 'alkira'
+        ) {
+            throw new RuntimeException(
+                'La tarea local solo admite MySQL local: alkira.'
+            );
+        }
+    } else {
+        $variables = [
+            'MYSQLHOST',
+            'MYSQLPORT',
+            'MYSQLDATABASE',
+            'MYSQLUSER',
+            'MYSQLPASSWORD'
+        ];
+
+        foreach ($variables as $variable) {
+            $valor = getenv($variable);
+
+            if ($valor === false || $valor === '') {
+                throw new RuntimeException(
+                    'Falta la variable de Railway: ' . $variable
+                );
+            }
+        }
+
+        if (getenv('MYSQLDATABASE') !== 'railway') {
+            throw new RuntimeException(
+                'La configuración de Railway apunta a otra base.'
+            );
+        }
     }
 
     $conexion = Conexion::obtenerConexion();
 
     if (
-        $conexion->query('SELECT DATABASE()')
-            ->fetchColumn() !== 'alkira'
+        $conexion->query('SELECT DATABASE()')->fetchColumn()
+        !== $baseEsperada
     ) {
         throw new RuntimeException(
-            'La conexión usa una base de datos distinta.'
+            'La conexión usa una base de datos distinta de la esperada.'
         );
     }
 
