@@ -1,10 +1,7 @@
-// Ruta en ALKIRA: AWP/vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Se usa MySQL local por defecto a través del backend PHP local.
-// Para probar contra Railway, definir ALKIRA_API_PROXY_TARGET al iniciar Vite.
 const destinoApi = process.env.ALKIRA_API_PROXY_TARGET || 'http://127.0.0.1:8000'
 
 export default defineConfig({
@@ -26,21 +23,27 @@ export default defineConfig({
         config: true,
       },
       manifest: {
+        id: '/',
         name: 'ALKIRA',
         short_name: 'ALKIRA',
         description: 'Administración inmobiliaria y condominial',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        lang: 'es-MX',
         theme_color: '#0b142e',
+        background_color: '#f4f7fc',
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
+        skipWaiting: true,
       },
       devOptions: {
         enabled: false,
-        navigateFallback: 'index.html',
-        suppressWarnings: true,
-        type: 'module',
       },
     }),
   ],

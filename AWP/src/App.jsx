@@ -13,10 +13,31 @@ function App() {
   const [verificando, setVerificando] = useState(true)
   const [seccionActiva, setSeccionActiva] = useState('resumen')
   const [errorConexion, setErrorConexion] = useState('')
+  const [sinConexion, setSinConexion] = useState(!navigator.onLine)
 
-  // Verificar la sesión administrativa al iniciar ALKIRA.
   useEffect(() => {
+    function actualizarConexion() {
+      setSinConexion(!navigator.onLine)
+    }
+
+    window.addEventListener('online', actualizarConexion)
+    window.addEventListener('offline', actualizarConexion)
+
+    return () => {
+      window.removeEventListener('online', actualizarConexion)
+      window.removeEventListener('offline', actualizarConexion)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (sinConexion) {
+      setVerificando(false)
+      return
+    }
+
     let activo = true
+    setVerificando(true)
+    setErrorConexion('')
 
     async function verificarSesion() {
       try {
@@ -26,8 +47,11 @@ function App() {
           setUsuario(usuarioActual)
         }
       } catch (error) {
-        if (activo && error.codigo !== 401) {
-          setErrorConexion(error.message)
+        if (activo) {
+          setUsuario(null)
+          if (error.codigo !== 401) {
+            setErrorConexion(error.message)
+          }
         }
       } finally {
         if (activo) {
@@ -41,7 +65,7 @@ function App() {
     return () => {
       activo = false
     }
-  }, [])
+  }, [sinConexion])
 
   // Cambiar entre las secciones autorizadas del sistema.
   function cambiarSeccion(nuevaSeccion) {
@@ -69,7 +93,28 @@ function App() {
     }
   }
 
-  // Esperar la comprobación de la sesión administrativa.
+  if (sinConexion) {
+    return (
+      <main className="alkira-login-pagina">
+        <section className="alkira-login-tarjeta bg-white p-4 rounded shadow-sm text-center">
+          <img
+            src="/logo-alkira.jpg"
+            alt="Logotipo de ALKIRA"
+            className="alkira-logo-login mb-3"
+          />
+          <h1 className="h4">ALKIRA está sin conexión</h1>
+          <p className="text-secondary">
+            La aplicación se puede abrir sin Internet, pero el inicio de sesión,
+            los estados de cuenta y las órdenes necesitan conexión con el servidor.
+          </p>
+          <p className="small text-secondary mb-0">
+            Al recuperar Internet, ALKIRA comprobará nuevamente tu sesión.
+          </p>
+        </section>
+      </main>
+    )
+  }
+
   if (verificando) {
     return (
       <main className="d-flex justify-content-center align-items-center min-vh-100">
