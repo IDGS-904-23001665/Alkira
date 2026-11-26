@@ -1,0 +1,21 @@
+
+{
+    auto_https off
+    admin off
+}
+
+:{$PORT:3000} {
+    encode gzip
+
+    handle /api/* {
+        reverse_proxy https://api-php-production-0578dc22.up.railway.app {
+            header_up Host api-php-production-0578dc22.up.railway.app
+        }
+    }
+
+    handle {
+        root * /app/dist
+        try_files {path} /index.html
+        file_server
+    }
+}
